@@ -26,13 +26,19 @@ void vic_init(void) {
     /* Select VIC bank 2 ($8000-$BFFF): bits 0-1 of CIA2 PRA, value %01. */
     CIA2_PRA = (CIA2_PRA & 0xFC) | 0x01;
 
-    /* Screen matrix at bank offset 0 ($8000), char base at offset $800 ($8800). */
-    VIC_MEMCTL = 0x02;
+    /* The C128 KERNAL's own IRQ periodically re-asserts $D018 back to its
+       stock default ($17 -- screen at bank offset $400, char base at
+       offset $1800) regardless of what we write here; it's never told
+       our screen/charset live elsewhere, so it keeps fighting any other
+       value. Rather than fight it every frame, we just build to the
+       addresses it already insists on: screen at $8400, char base at
+       $9800 (see SCREEN in vic.h). */
+    VIC_MEMCTL = 0x17;
 
     /* Plain hires text mode (no multicolor, no extended color). */
     VIC_MCM &= (unsigned char)~0x10;
 
-    memcpy((void *)0x8800, charset_data, 2048);
+    memcpy((void *)0x9800, charset_data, 2048);
 
     VIC_BORDER = COL_BLACK;
     VIC_BG0 = COL_BLACK;

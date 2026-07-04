@@ -1,13 +1,15 @@
 #ifndef VIC_H
 #define VIC_H
 
-/* VIC bank 2 ($8000-$BFFF): screen matrix at $8000, charset at $8800.
-   cc65's default c64.cfg places program code/data in one contiguous region
-   from $0801 up toward $9FFF, so anything below $8000 is fair game for the
-   linker. Bank 2 sits well above where this program will ever grow (it's
-   currently ~15KB, and $8000 leaves about 30KB of headroom), so there is
-   no risk of code colliding with the display memory we poke directly. */
-#define SCREEN ((unsigned char *)0x8000)
+/* VIC bank 2 ($8000-$BFFF): screen matrix at $8400, charset at $9800 --
+   these specific offsets ($400 and $1800 into the bank) aren't a free
+   choice. The C128 KERNAL's own IRQ periodically re-asserts $D018 back to
+   its stock default ($17) no matter what vic_init() writes there, so
+   rather than fight that every frame we just build to the addresses that
+   value already implies. cc65's default c128.cfg places program code/data
+   in a contiguous region well below $8000, so there's no risk of code
+   colliding with the display memory we poke directly. */
+#define SCREEN ((unsigned char *)0x8400)
 #define COLOR ((unsigned char *)0xD800)
 
 /* C64 colors */

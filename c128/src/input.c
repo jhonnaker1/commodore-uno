@@ -1,3 +1,4 @@
+#include <6502.h>
 #include "input.h"
 
 #define CIA1_PRA (*(unsigned char *)0xDC00)
@@ -14,11 +15,17 @@
 typedef struct { unsigned char col, row; } KeyPos;
 
 /* index: 0=space 1=return 2=crsr L/R 3=crsr U/D 4=l-shift 5=r-shift,
-   6-15='1'-'9','0', 16-25='A'-'J'. Standard C64/C128 matrix positions. */
+   6-15='1'-'9','0', 16-25='A'-'J'.
+   Verified empirically against the real matrix (via a live on-screen
+   scan while pressing each key in VICE) rather than trusted from memory
+   -- the previous table had every (col,row) pair transposed from what
+   this hardware/emulation actually reports (e.g. space came back as
+   col 7/row 4, not the col 4/row 7 the "standard" C64 reference table
+   implied), which is why no key ever registered. */
 static const KeyPos KEYS[26] = {
-    {4, 7}, {1, 0}, {2, 0}, {7, 0}, {7, 1}, {4, 6},
-    {0, 7}, {3, 7}, {0, 1}, {3, 1}, {0, 2}, {3, 2}, {0, 3}, {3, 3}, {0, 4}, {3, 4},
-    {2, 1}, {4, 3}, {4, 2}, {2, 2}, {6, 1}, {5, 2}, {2, 3}, {5, 3}, {1, 4}, {2, 4}
+    {7, 4}, {0, 1}, {0, 2}, {0, 7}, {1, 7}, {6, 4},
+    {7, 0}, {7, 3}, {1, 0}, {1, 3}, {2, 0}, {2, 3}, {3, 0}, {3, 3}, {4, 0}, {4, 3},
+    {1, 2}, {3, 4}, {2, 4}, {2, 2}, {1, 6}, {2, 5}, {3, 2}, {3, 5}, {4, 1}, {4, 2}
 };
 
 static unsigned char prev_joy = 0;
@@ -26,17 +33,28 @@ static unsigned char prev_special = 0;
 static unsigned char prev_qs_active = 0;
 static unsigned char quick_select = IN_NONE;
 
+/* The KERNAL's own 60Hz IRQ is still running (we never disabled it) and
+   does its own column-select/row-read of CIA1 for cursor blink and its
+   now-unused keyboard buffer. If that IRQ lands between our column write
+   and row read, it clobbers the column we just selected -- so the whole
+   read has to happen with interrupts off. */
 static unsigned char key_down(unsigned char idx) {
-    unsigned char save = CIA1_PRA;
+    unsigned char save;
     unsigned char pressed;
+    SEI();
+    save = CIA1_PRA;
     CIA1_PRA = (unsigned char)~(1 << KEYS[idx].col);
     pressed = (CIA1_PRB & (1 << KEYS[idx].row)) == 0;
     CIA1_PRA = save;
+    CLI();
     return pressed;
 }
 
 unsigned char joy_state(void) {
-    unsigned char raw = ~CIA1_PRA; /* joystick port 2, active low */
+    unsigned char raw;
+    SEI();
+    raw = ~CIA1_PRA; /* joystick port 2, active low */
+    CLI();
     return raw & 0x1F;
 }
 
