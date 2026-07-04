@@ -167,7 +167,7 @@ static unsigned char human_turn(GameState *g) {
             ui_draw_opponents(g);
             ui_draw_table(g);
             ui_draw_hand(g, cursor);
-            ui_message("YOUR TURN", "L/R/FIRE, UP:DRAW, OR A CARD'S KEY");
+            ui_message("YOUR TURN", ",/.:PICK FIRE:PLAY U:DRAW OR A KEY");
             redraw = 0;
         }
         wait_vsync();

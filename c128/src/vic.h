@@ -1,14 +1,17 @@
 #ifndef VIC_H
 #define VIC_H
 
-/* VIC bank 2 ($8000-$BFFF): screen matrix at $8400, charset at $9800 --
-   these specific offsets ($400 and $1800 into the bank) aren't a free
-   choice. The C128 KERNAL's own IRQ periodically re-asserts $D018 back to
-   its stock default ($17) no matter what vic_init() writes there, so
-   rather than fight that every frame we just build to the addresses that
-   value already implies. cc65's default c128.cfg places program code/data
-   in a contiguous region well below $8000, so there's no risk of code
-   colliding with the display memory we poke directly. */
+/* VIC bank 2 ($8000-$BFFF): screen matrix at $8400 (bank offset $400 --
+   the C128 KERNAL's own IRQ periodically re-asserts $D018's screen-
+   address bits back to that default, so we build to it rather than
+   fight it every frame). Charset at $A000 (bank offset $2000): the
+   KERNAL's own preferred char-base offset, $1800, is a hardware trap on
+   VIC bank 0/2 (hardwired to show the internal character ROM instead of
+   RAM), so unlike the screen address we do have to keep re-winning that
+   part of the fight every frame -- see wait_vsync() in vic.c. cc65's
+   default c128.cfg places program code/data in a contiguous region well
+   below $8000, so there's no risk of code colliding with the display
+   memory we poke directly. */
 #define SCREEN ((unsigned char *)0x8400)
 #define COLOR ((unsigned char *)0xD800)
 

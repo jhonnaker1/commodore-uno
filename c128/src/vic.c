@@ -9,9 +9,22 @@
 #define VIC_MCM (*(unsigned char *)0xD016)
 #define VIC_RASTER (*(unsigned char *)0xD012)
 
+/* KERNAL zero-page screen-editor variables (same layout as C64): PNT
+   (current screen line address, lo/hi) and PNTR (cursor column). */
+#define KERNAL_PNT_LO (*(unsigned char *)0xD1)
+#define KERNAL_PNT_HI (*(unsigned char *)0xD2)
+#define KERNAL_PNTR (*(unsigned char *)0xD3)
+
+/* The KERNAL re-asserts the *entire* $D018 byte back to its own default
+   ($17) periodically -- confirmed by writing a different char-base value
+   and reading it straight back as $17 again. We need to disagree with it
+   on the char-base bits (see vic_init()), so we have to keep re-winning
+   that fight every frame rather than just building to its preferred
+   value the way we do for the screen-address bits. */
 void wait_vsync(void) {
     while (VIC_RASTER != 0) {}
     while (VIC_RASTER == 0) {}
+    VIC_MEMCTL = 0x18;
 }
 
 static unsigned char ascii_to_screencode(char c) {
@@ -26,22 +39,34 @@ void vic_init(void) {
     /* Select VIC bank 2 ($8000-$BFFF): bits 0-1 of CIA2 PRA, value %01. */
     CIA2_PRA = (CIA2_PRA & 0xFC) | 0x01;
 
-    /* The C128 KERNAL's own IRQ periodically re-asserts $D018 back to its
-       stock default ($17 -- screen at bank offset $400, char base at
-       offset $1800) regardless of what we write here; it's never told
-       our screen/charset live elsewhere, so it keeps fighting any other
-       value. Rather than fight it every frame, we just build to the
-       addresses it already insists on: screen at $8400, char base at
-       $9800 (see SCREEN in vic.h). */
-    VIC_MEMCTL = 0x17;
+    /* The C128 KERNAL's own IRQ periodically re-asserts $D018's screen-
+       address bits back to its stock default (screen at bank offset
+       $400), so we build to that instead of fighting it every frame --
+       see SCREEN in vic.h. The char-base bits are ours to choose freely
+       though, and offset $1800 (the KERNAL's own default there) is a
+       trap: on VIC bank 0 or 2, char-base offsets $1000 and $1800 are
+       hardwired to show the internal character ROM, ignoring RAM
+       entirely -- which is why custom glyphs 128-255 were silently
+       aliasing to glyphs 0-127 (that ROM range's upper half is just a
+       reverse-video mirror of its lower half). Offset $2000 avoids it. */
+    VIC_MEMCTL = 0x18;
 
     /* Plain hires text mode (no multicolor, no extended color). */
     VIC_MCM &= (unsigned char)~0x10;
 
-    memcpy((void *)0x9800, charset_data, 2048);
+    memcpy((void *)0xA000, charset_data, 2048);
 
     VIC_BORDER = COL_BLACK;
     VIC_BG0 = COL_BLACK;
+
+    /* The KERNAL's screen editor still thinks the screen is at its
+       default $0400 (it was never told otherwise), and its IRQ-driven
+       cursor housekeeping apparently depends on that being accurate --
+       plausibly why the whole keyboard buffer goes dead once the screen
+       actually lives at $8400 instead. Point it at the real location. */
+    KERNAL_PNT_LO = (unsigned char)((unsigned int)SCREEN & 0xFF);
+    KERNAL_PNT_HI = (unsigned char)((unsigned int)SCREEN >> 8);
+    KERNAL_PNTR = 0;
 
     scr_clear();
 }

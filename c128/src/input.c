@@ -4,26 +4,27 @@
 #define CIA1_PRA (*(unsigned char *)0xDC00)
 #define CIA1_PRB (*(unsigned char *)0xDC01)
 
-/* The C128's KERNAL IRQ (which normally fills the keyboard buffer that
-   kbhit()/cgetc() read from) stops delivering real key presses once we
-   relocate the VIC-IIe screen to bank 2 -- everything else keeps running
-   fine, just the keyboard buffer goes dead. Rather than chase that, we
-   scan the keyboard matrix directly through CIA1, exactly like the
-   joystick read below, so keyboard input never depends on the KERNAL
-   IRQ or its buffer at all. */
+/* The C128's dedicated cursor keys turned out to be unreachable both by
+   a raw CIA1 matrix scan (confirmed empirically: no bit anywhere in
+   PRA/PRB, in either column/row orientation, changes when they're
+   pressed -- they live outside the standard 8x8 matrix used here) and
+   by the KERNAL's own keyboard buffer (kbhit()/cgetc() go completely
+   dead once the screen is relocated to VIC bank 2, for reasons that
+   resisted several fix attempts, including correcting the KERNAL's
+   cursor-tracking zero page variables). So navigation is remapped to
+   ordinary matrix keys that ARE confirmed working: comma/period for
+   left/right (they sit right next to space on this keyboard) and 'U'
+   for draw. Positions below were looked up directly from VICE's own
+   C128 keymap file rather than trusted from a "standard" reference
+   table, since that reference table was already wrong once this
+   session for several other keys. */
 
 typedef struct { unsigned char col, row; } KeyPos;
 
-/* index: 0=space 1=return 2=crsr L/R 3=crsr U/D 4=l-shift 5=r-shift,
-   6-15='1'-'9','0', 16-25='A'-'J'.
-   Verified empirically against the real matrix (via a live on-screen
-   scan while pressing each key in VICE) rather than trusted from memory
-   -- the previous table had every (col,row) pair transposed from what
-   this hardware/emulation actually reports (e.g. space came back as
-   col 7/row 4, not the col 4/row 7 the "standard" C64 reference table
-   implied), which is why no key ever registered. */
-static const KeyPos KEYS[26] = {
-    {7, 4}, {0, 1}, {0, 2}, {0, 7}, {1, 7}, {6, 4},
+/* index: 0=space 1=return 2=comma(left) 3=period(right) 4=u(draw),
+   5-14='1'-'9','0', 15-24='A'-'J'. */
+static const KeyPos KEYS[25] = {
+    {7, 4}, {0, 1}, {5, 7}, {5, 4}, {3, 6},
     {7, 0}, {7, 3}, {1, 0}, {1, 3}, {2, 0}, {2, 3}, {3, 0}, {3, 3}, {4, 0}, {4, 3},
     {1, 2}, {3, 4}, {2, 4}, {2, 2}, {1, 6}, {2, 5}, {3, 2}, {3, 5}, {4, 1}, {4, 2}
 };
@@ -34,10 +35,10 @@ static unsigned char prev_qs_active = 0;
 static unsigned char quick_select = IN_NONE;
 
 /* The KERNAL's own 60Hz IRQ is still running (we never disabled it) and
-   does its own column-select/row-read of CIA1 for cursor blink and its
-   now-unused keyboard buffer. If that IRQ lands between our column write
-   and row read, it clobbers the column we just selected -- so the whole
-   read has to happen with interrupts off. */
+   does its own column-select/row-read of CIA1 for cursor blink. If that
+   IRQ lands between our column write and row read, it clobbers the
+   column we just selected -- so the whole read has to happen with
+   interrupts off. */
 static unsigned char key_down(unsigned char idx) {
     unsigned char save;
     unsigned char pressed;
@@ -62,13 +63,12 @@ unsigned char joy_quick_select(void) {
     return quick_select;
 }
 
-/* Edge-triggered: joystick port 2 OR the keyboard (cursor keys + space/return
-   + '1'-'9'/'0'/'A'-'J' quick-play), so the game is playable with no
-   joystick configured at all. */
+/* Edge-triggered: joystick port 2 OR the keyboard (comma/period/U for
+   left/right/draw, space/return to play, '1'-'9'/'0'/'A'-'J' quick-play),
+   so the game is playable with no joystick configured at all. */
 unsigned char joy_pressed(void) {
     unsigned char cur_joy = joy_state();
     unsigned char newly = cur_joy & (unsigned char)~prev_joy;
-    unsigned char shift;
     unsigned char cur_special = 0;
     unsigned char i;
     unsigned char qs_down = IN_NONE;
@@ -76,17 +76,16 @@ unsigned char joy_pressed(void) {
     prev_joy = cur_joy;
     quick_select = IN_NONE;
 
-    shift = key_down(4) || key_down(5);
-
     if (key_down(0) || key_down(1)) cur_special |= IN_FIRE;
-    if (key_down(2)) cur_special |= shift ? IN_LEFT : IN_RIGHT;
-    if (key_down(3)) cur_special |= shift ? IN_UP : IN_DOWN;
+    if (key_down(2)) cur_special |= IN_LEFT;
+    if (key_down(3)) cur_special |= IN_RIGHT;
+    if (key_down(4)) cur_special |= IN_UP;
     newly |= cur_special & (unsigned char)~prev_special;
     prev_special = cur_special;
 
-    for (i = 6; i < 26; i++) {
+    for (i = 5; i < 25; i++) {
         if (key_down(i)) {
-            qs_down = (unsigned char)(i - 6);
+            qs_down = (unsigned char)(i - 5);
             break;
         }
     }

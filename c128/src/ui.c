@@ -84,9 +84,9 @@ void ui_title_screen(void) {
     scr_puts(6, 5, "FOR THE COMMODORE 128 (40-COL)", COL_WHITE);
     scr_puts(6, 10, "1 PLAYER VS 3 COMPUTER PLAYERS", COL_LTGRAY);
     scr_puts(9, 12, "JOYSTICK IN PORT 2, OR:", COL_CYAN);
-    scr_puts(6, 13, "CRSR LEFT/RIGHT: PICK A CARD", COL_CYAN);
+    scr_puts(6, 13, ", AND .: PICK A CARD", COL_CYAN);
     scr_puts(6, 14, "SPACE OR RETURN: PLAY / CONFIRM", COL_CYAN);
-    scr_puts(6, 15, "CRSR UP: DRAW A CARD", COL_CYAN);
+    scr_puts(6, 15, "U: DRAW A CARD", COL_CYAN);
     scr_puts(2, 16, "OR PRESS 1-9,0,A-J: PLAY THAT CARD", COL_CYAN);
     scr_puts(2, 17, "S=SKIP R=REVERSE D=DRAW2", COL_LTGRAY);
     scr_puts(2, 18, "W=WILD F=WILD DRAW FOUR", COL_LTGRAY);
