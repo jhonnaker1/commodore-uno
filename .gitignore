@@ -1,0 +1,9 @@
+build/*
+!build/.gitkeep
+*.o
+*.prg
+*.map
+*.vlabels
+*.d64
+.DS_Store
+.claude/
