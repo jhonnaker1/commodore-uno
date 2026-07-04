@@ -1,85 +1,83 @@
-#include <time.h>
-#include <pet.h>
 #include "petsound.h"
 
-static void delay_jiffies(unsigned char n) {
-    clock_t target = clock() + n;
-    while (clock() < target) {}
-}
+#define PCR (*(unsigned char *)0xE84C)
 
 void snd_init(void) {
-    VIA.ddrb |= 0x80;
-    VIA.acr &= 0x3F;
+    PCR = (PCR & 0x1F) | 0xC0; /* CB2 manual output, low (silent) */
 }
 
-/* freq in Hz (approx, PET's 1MHz clock / 2 / (n+2) per half-period);
-   silent (acr's PB7 output disabled) when freq is 0. */
-static void tone(unsigned int freq, unsigned char jiffies) {
-    unsigned int n;
-    if (freq == 0) {
-        delay_jiffies(jiffies);
-        return;
+/* Bit-bangs a square wave on CB2: delay controls pitch (smaller = higher),
+   cycles controls how long the tone plays. There's no way to derive exact
+   Hz from cc65's compiled loop timing without hardware in hand, so these
+   are tuned by ear against the emulator rather than computed. */
+static void tone(unsigned int delay, unsigned int cycles) {
+    unsigned int i, j;
+    for (j = 0; j < cycles; j++) {
+        PCR = (PCR & 0x1F) | 0xE0;
+        for (i = 0; i < delay; i++) { }
+        PCR = (PCR & 0x1F) | 0xC0;
+        for (i = 0; i < delay; i++) { }
     }
-    n = (unsigned int)(500000UL / freq);
-    n = (n > 2) ? (unsigned int)(n - 2) : 1;
-    VIA.acr = (unsigned char)((VIA.acr & 0x3F) | 0xC0);
-    VIA.t1l_lo = (unsigned char)(n & 0xFF);
-    VIA.t1_hi = (unsigned char)(n >> 8);
-    delay_jiffies(jiffies);
-    VIA.acr &= 0x3F;
+}
+
+static void silence(unsigned int cycles) {
+    unsigned int i, j;
+    for (j = 0; j < cycles; j++) {
+        for (i = 0; i < 40; i++) { }
+    }
 }
 
 void sfx_card_play(void) {
-    tone(300, 3);
+    tone(40, 40);
 }
 
 void sfx_invalid(void) {
-    tone(110, 10);
+    tone(150, 50);
 }
 
 void sfx_draw(void) {
-    tone(700, 2);
+    tone(20, 25);
 }
 
 void sfx_draw_multi(unsigned char count) {
     unsigned char i;
-    if (count > 6) count = 6;
+    if (count > 4) count = 4;
     for (i = 0; i < count; i++) {
-        tone(700, 2);
-        tone(0, 2);
+        tone(20, 25);
+        silence(15);
     }
 }
 
 void sfx_skip(void) {
-    tone(500, 4);
-    tone(250, 6);
+    tone(60, 30);
+    tone(100, 35);
 }
 
 void sfx_reverse(void) {
-    tone(400, 3);
-    tone(600, 3);
-    tone(400, 3);
+    tone(70, 25);
+    tone(45, 25);
+    tone(70, 25);
 }
 
 void sfx_uno(void) {
-    tone(440, 4);
-    tone(554, 4);
-    tone(659, 6);
+    tone(90, 25);
+    tone(65, 25);
+    tone(45, 30);
 }
 
 void sfx_win(void) {
-    tone(440, 5);
-    tone(554, 5);
-    tone(659, 5);
-    tone(880, 10);
+    tone(90, 25);
+    tone(65, 25);
+    tone(45, 25);
+    tone(25, 40);
 }
 
 void sfx_challenge_success(void) {
-    tone(500, 5);
-    tone(800, 8);
+    tone(60, 25);
+    tone(25, 35);
 }
 
 void sfx_challenge_fail(void) {
-    tone(300, 5);
-    tone(150, 10);
+    tone(45, 25);
+    tone(150, 40);
 }

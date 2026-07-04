@@ -55,8 +55,3 @@ confirm, cursor up to draw, or jump straight to a card with `1`-`9`, `0`,
   output omits large portions of that same, frozen-instant memory content
   — not a timing/tearing artifact, not a hang, not a logic bug; genuinely
   unexplained rendering behavior that needs more investigation.
-- **PET 4032 sound**: best-effort single-voice beeper driven off the VIA's
-  Timer 1 / PB7 square wave, since the PET has no dedicated sound chip.
-  Implemented against documented 6522 behavior but not confirmed audible
-  by ear (no speakers accessible during development) — flagging honestly
-  rather than claiming it's verified.
