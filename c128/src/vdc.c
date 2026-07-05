@@ -55,12 +55,22 @@ unsigned char vdc_data_read_selected(void) {
     return v;
 }
 
+/* Register 28's high bits (character set base) -- computed once in
+   vdc_init() and re-asserted every frame below. Setting it only once at
+   init still produced garbled glyphs on screen; the likely explanation is
+   the same fight the VIC-IIe path has to keep winning against the
+   KERNAL's IRQ over $D018 (see vic.c's wait_vsync()): the KERNAL's
+   80-column cursor-blink IRQ probably re-pokes VDC register 28 back to
+   its own default periodically, undoing an init-time-only write. */
+static unsigned char reg28_value;
+
 /* The VIC-IIe keeps rastering at the normal PAL/NTSC rate even while the
    VDC drives the visible display, so its raster register still makes a
    perfectly good free frame-rate timer for pacing screen updates. */
 void wait_vsync(void) {
     while (VIC_RASTER != 0) {}
     while (VIC_RASTER == 0) {}
+    vdc_reg_write(28, reg28_value);
 }
 
 static unsigned char ascii_to_screencode(char c) {
@@ -82,11 +92,16 @@ void vdc_init(void) {
     /* Enable attribute (per-character color) mode, keep other mode bits. */
     vdc_reg_write(25, (unsigned char)(vdc_reg_read(25) | 0x40));
 
-    /* Character set base address: deliberately NOT touching register 28.
-       KERNAL already points it at VDC_CHARSET_BASE (0x2000) by default for
-       its own font, and that register's low nibble carries unrelated bits
-       (underline scan line) that must not be clobbered. We just overwrite
-       the character bitmaps living at that same, already-configured address. */
+    /* Character set base address (register 28): bits 5-7 select the 8K
+       page (value = base >> 13, shifted into position), bits 0-4 are the
+       underline scan line and must be preserved rather than clobbered.
+       An earlier version of this driver assumed the KERNAL already leaves
+       this pointed at VDC_CHARSET_BASE by default and skipped writing it
+       -- that assumption was never actually verified against real VDC
+       behavior. Actual value is re-asserted every frame in wait_vsync(). */
+    reg28_value = (unsigned char)((vdc_reg_read(28) & 0x1F) |
+                                   ((VDC_CHARSET_BASE >> 13) << 5));
+    vdc_reg_write(28, reg28_value);
 
     /* Background color (shared across the whole screen, low nibble). */
     vdc_reg_write(26, COL_BLACK);
@@ -96,8 +111,18 @@ void vdc_init(void) {
        auto-incrementing address partway through. Keep it atomic. */
     __asm__("sei");
     vdc_set_address(VDC_CHARSET_BASE);
-    for (i = 0; i < 2048; i++) {
-        vdc_data_write(charset_data[i]);
+    /* The VDC's character generator memory is organized in 16-byte slots
+       per glyph even for an 8-scanline-tall font (register 9 selects how
+       many of those 16 bytes are actually displayed) -- confirmed via the
+       remote monitor: register 28/9 and the uploaded data were all
+       correct, yet glyphs still rendered wrong, consistently, until this
+       padding was added. charset_data is tightly packed at 8 bytes/glyph,
+       so pad every glyph out to 16 on the way in rather than change that
+       shared, VIC-II-format source data. */
+    for (i = 0; i < 256; i++) {
+        unsigned char k;
+        for (k = 0; k < 8; k++) vdc_data_write(charset_data[i * 8 + k]);
+        for (k = 0; k < 8; k++) vdc_data_write(0);
     }
     __asm__("cli");
 

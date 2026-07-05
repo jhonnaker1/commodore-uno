@@ -16,7 +16,7 @@ vary wildly across this lineup.
 | Directory | Machine | Status |
 |---|---|---|
 | [`c64/`](c64) | Commodore 64 | Complete — custom charset, hardware sprites, SID sound (filter/ring-mod), full card animations |
-| [`c128/`](c128) | Commodore 128 (40-column) | Complete — reuses the C64's VIC-IIe path; keyboard input is scanned directly off CIA1 rather than via the KERNAL buffer |
+| [`c128/`](c128) | Commodore 128 (40-column, or 80-column VDC) | Complete — the primary build reuses the C64's VIC-IIe path (keyboard input is scanned directly off CIA1 rather than via the KERNAL buffer); `make run-vdc` builds an alternate 80-column version driving the 8563/8568 VDC chip instead |
 | [`plus4/`](plus4) | Commodore Plus/4 | Complete — TED video/sound, stock font |
 | [`pet/`](pet) | Commodore PET 4032 | Complete — monochrome text UI, single-voice VIA beeper, keyboard only (no joystick port) |
 | [`vic20/`](vic20) | Commodore VIC-20 (+memory expansion) | **Paused** — an unresolved VIC-chip rendering bug causes large parts of a correct, in-memory screen to not actually display; see [`vic20/`](vic20) for details |
@@ -30,7 +30,8 @@ Each platform directory is independent and builds with `make` (requires
 
 ```sh
 cd c64 && make run     # builds build/uno.prg and launches it in x64sc
-cd c128 && make run    # build/uno128.prg in x128
+cd c128 && make run    # build/uno128.prg in x128 (40-column, VIC-IIe)
+cd c128 && make run-vdc # build/uno128vdc.prg in x128 (80-column, VDC)
 cd plus4 && make run   # build/uno4.prg in xplus4
 cd pet && make run     # build/uno.prg in xpet
 cd vic20 && make run   # build/uno20.prg in xvic -memory all (known broken)
