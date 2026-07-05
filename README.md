@@ -1,9 +1,11 @@
 # Commodore UNO
 
-UNO for classic 8-bit Commodore machines: 1 human player vs. 3 CPU
-opponents, full rules (Skip, Reverse, Draw Two, Wild, Wild Draw Four with
-challenge), written in C against the [cc65](https://cc65.github.io/) 6502
-toolchain and tested in [VICE](https://vice-emu.sourceforge.io/).
+UNO for classic 8-bit machines (mostly Commodore, plus one Atari): 1 human
+player vs. 3 CPU opponents, full rules (Skip, Reverse, Draw Two, Wild, Wild
+Draw Four with challenge), written in C against the
+[cc65](https://cc65.github.io/) 6502 toolchain and tested in
+[VICE](https://vice-emu.sourceforge.io/) (Commodore) and
+[Atari800](https://atari800.github.io/) (Atari).
 
 Each platform is its own self-contained subdirectory sharing the same card
 game logic (`cards.c/h`, `game.c/h`, `ai.c/h`) with a platform-specific
@@ -17,6 +19,7 @@ vary wildly across this lineup.
 | [`plus4/`](plus4) | Commodore Plus/4 | Complete — TED video/sound, stock font |
 | [`pet/`](pet) | Commodore PET 4032 | Complete — monochrome text UI, single-voice VIA beeper, keyboard only (no joystick port) |
 | [`vic20/`](vic20) | Commodore VIC-20 (+memory expansion) | **Paused** — an unresolved VIC-chip rendering bug causes large parts of a correct, in-memory screen to not actually display; see [`vic20/`](vic20) for details |
+| [`atari/`](atari) | Atari 800XL | Complete — standard ANTIC text mode (no per-cell color, so cards use color letters + reverse-video selection like the VIC-20/PET), 4-channel POKEY sound |
 
 ## Building
 
@@ -29,6 +32,7 @@ cd c128 && make run    # build/uno128.prg in x128
 cd plus4 && make run   # build/uno4.prg in xplus4
 cd pet && make run     # build/uno.prg in xpet
 cd vic20 && make run   # build/uno20.prg in xvic -memory all (known broken)
+cd atari && make run XLXE_ROM=/path/to/your/atarixl.rom  # build/uno.xex in atari800
 ```
 
 `make` alone just builds; `make clean` removes build artifacts.
