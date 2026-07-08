@@ -21,7 +21,7 @@ vary wildly across this lineup.
 | [`c64/`](c64) | Commodore 64 | Complete — custom charset, hardware sprites, SID sound (filter/ring-mod), full card animations |
 | [`c128/`](c128) | Commodore 128 (40-column, or 80-column VDC) | Complete — the primary build reuses the C64's VIC-IIe path (keyboard input is scanned directly off CIA1 rather than via the KERNAL buffer); `make run-vdc` builds an alternate 80-column version driving the 8563/8568 VDC chip instead |
 | [`plus4/`](plus4) | Commodore Plus/4 | Complete — TED video/sound, stock font |
-| [`pet/`](pet) | Commodore PET 4032 | Complete — monochrome text UI, single-voice VIA beeper, keyboard only (no joystick port) |
+| [`pet/`](pet) | Commodore PET 4032 (40-column, or 80-column 8032) | Complete — monochrome text UI, single-voice VIA beeper, keyboard only (no joystick port); `make run-8032` builds an alternate 80-column version for the PET 8032 (same hardware family, just double the columns) |
 | [`vic20/`](vic20) | Commodore VIC-20 (+memory expansion) | Complete — redirects the VIC's video matrix back to $1E00 to dodge a real rendering bug at the KERNAL's relocated $1000, color-coded suits (letter + color, since the VIC-20 has real per-cell color after all) |
 | [`atari/`](atari) | Atari 800XL | Complete — standard ANTIC text mode (no per-cell color, so cards use color letters + reverse-video selection like the VIC-20/PET), 4-channel POKEY sound |
 | [`apple/`](apple) | Apple IIe (enhanced) | Complete — 40x24 text mode (no per-cell color, reverse-video selection like the VIC-20/PET/Atari), 1-bit speaker bit-banged for tones; ships as a ProDOS `.SYSTEM` file, see [`apple/`](apple) for how to get it onto a bootable disk image |
@@ -38,6 +38,7 @@ cd c128 && make run    # build/uno128.prg in x128 (40-column, VIC-IIe)
 cd c128 && make run-vdc # build/uno128vdc.prg in x128 (80-column, VDC)
 cd plus4 && make run   # build/uno4.prg in xplus4
 cd pet && make run     # build/uno.prg in xpet
+cd pet && make run-8032 # build/uno8032.prg in xpet -model 8032
 cd vic20 && make run   # build/uno20.prg in xvic -memory all
 cd atari && make run XLXE_ROM=/path/to/your/atarixl.rom  # build/uno.xex in atari800
 cd apple && make      # build/uno.system -- see apple/ for the ProDOS disk-image step
