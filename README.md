@@ -19,7 +19,7 @@ vary wildly across this lineup.
 | [`c128/`](c128) | Commodore 128 (40-column, or 80-column VDC) | Complete — the primary build reuses the C64's VIC-IIe path (keyboard input is scanned directly off CIA1 rather than via the KERNAL buffer); `make run-vdc` builds an alternate 80-column version driving the 8563/8568 VDC chip instead |
 | [`plus4/`](plus4) | Commodore Plus/4 | Complete — TED video/sound, stock font |
 | [`pet/`](pet) | Commodore PET 4032 | Complete — monochrome text UI, single-voice VIA beeper, keyboard only (no joystick port) |
-| [`vic20/`](vic20) | Commodore VIC-20 (+memory expansion) | **Paused** — an unresolved VIC-chip rendering bug causes large parts of a correct, in-memory screen to not actually display; see [`vic20/`](vic20) for details |
+| [`vic20/`](vic20) | Commodore VIC-20 (+memory expansion) | Complete — redirects the VIC's video matrix back to $1E00 to dodge a real rendering bug at the KERNAL's relocated $1000, color-coded suits (letter + color, since the VIC-20 has real per-cell color after all) |
 | [`atari/`](atari) | Atari 800XL | Complete — standard ANTIC text mode (no per-cell color, so cards use color letters + reverse-video selection like the VIC-20/PET), 4-channel POKEY sound |
 | [`apple/`](apple) | Apple IIe (enhanced) | Complete — 40x24 text mode (no per-cell color, reverse-video selection like the VIC-20/PET/Atari), 1-bit speaker bit-banged for tones; ships as a ProDOS `.SYSTEM` file, see [`apple/`](apple) for how to get it onto a bootable disk image |
 
@@ -34,7 +34,7 @@ cd c128 && make run    # build/uno128.prg in x128 (40-column, VIC-IIe)
 cd c128 && make run-vdc # build/uno128vdc.prg in x128 (80-column, VDC)
 cd plus4 && make run   # build/uno4.prg in xplus4
 cd pet && make run     # build/uno.prg in xpet
-cd vic20 && make run   # build/uno20.prg in xvic -memory all (known broken)
+cd vic20 && make run   # build/uno20.prg in xvic -memory all
 cd atari && make run XLXE_ROM=/path/to/your/atarixl.rom  # build/uno.xex in atari800
 cd apple && make      # build/uno.system -- see apple/ for the ProDOS disk-image step
 ```
@@ -71,10 +71,16 @@ keyboard — cursor left/right to pick a card, space/return to play or
 confirm, cursor up to draw, or jump straight to a card with `1`-`9`, `0`,
 `A`-`J`.
 
-## Known issues
+## Notes
 
-- **VIC-20**: paused. Game logic and screen memory are verified correct
-  (via VICE monitor memory dumps) but the VIC chip's actual rendered
-  output omits large portions of that same, frozen-instant memory content
-  — not a timing/tearing artifact, not a hang, not a logic bug; genuinely
-  unexplained rendering behavior that needs more investigation.
+- **VIC-20**: with a memory expansion installed, the KERNAL relocates the
+  screen matrix to $1000 by default -- and the real VIC chip has a
+  genuine, reproducible rendering bug there (large parts of a correct,
+  in-memory screen just don't display), independent of RAM amount or
+  KERNAL. `vic20io.c`'s `vic20_init()` works around it by reprogramming
+  the VIC's video-matrix registers back to $1E00 (the stock/unexpanded
+  default, which renders fine) instead. The custom linker config
+  (`vic20-highmem.cfg`) deliberately leaves $1000-$1FFF free of code/data
+  so that's safe to do, but its non-contiguous memory layout also means
+  cc65's auto-generated "SYS nnnn" BASIC-stub address comes out wrong
+  after linking; `tools/patch_sys_addr.py` fixes it up as a build step.

@@ -15,11 +15,32 @@ static unsigned char ascii_to_screencode(char c) {
     return 32;
 }
 
+#define VIC_REG2 (*(unsigned char *)0x9002)
+#define VIC_REG5 (*(unsigned char *)0x9005)
+#define VIC_REG15 (*(unsigned char *)0x900F)
+
 void vic20_init(void) {
-    /* Deliberately leaving the KERNAL's default background/border color
-       alone (the classic VIC-20 blue) rather than fighting whatever makes
-       that register behave unexpectedly -- text colors are chosen to read
-       well against it instead. */
+    /* Redirect the VIC's video matrix back to $1E00 (see the comment on
+       SCREEN in vic20io.h) instead of wherever the KERNAL relocated it to
+       when it detected expansion RAM. Values taken directly from the
+       working unexpanded config's own registers, not computed from a
+       formula (an earlier attempt to compute an alternate address that
+       way produced garbage). */
+    VIC_REG2 = (VIC_REG2 & 0x7F) | 0x80;
+    VIC_REG5 = (VIC_REG5 & 0x0F) | 0xF0;
+
+    /* The KERNAL's actual unexpanded default is a WHITE background/cyan
+       border (confirmed via the VICE monitor: $900F reads $1B), not the
+       "classic VIC-20 blue" an earlier comment here assumed -- that
+       assumption was never verified and left the whole title screen
+       rendering as invisible white-on-white text. Force a black
+       background/border instead, matching every other platform in this
+       project (dark background, light text) so the existing color
+       choices in ui.c actually show up. Bit 3 must stay set (screen
+       normal, not reverse); bits 0-2 = border color, bits 4-7 = background
+       color, both 0 = black. */
+    VIC_REG15 = 0x08;
+
     scr_clear();
 }
 

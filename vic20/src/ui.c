@@ -2,14 +2,16 @@
 #include "ui.h"
 #include "vic20io.h"
 
-/* Color RAM on this VIC-20 setup turned out not to visibly affect
-   rendering at all (confirmed empirically -- every color value produced
-   the same on-screen shade), so every card is labeled with an explicit
-   color LETTER as well as its value, and selection is shown with
-   brackets rather than a color change. Everything here is deliberately
-   terse: the VIC-20's screen is only 22 columns wide (a hardware limit,
-   not something memory expansion changes), so every string length is
-   hand-counted against that. */
+/* Color RAM was earlier thought not to visibly affect rendering at all,
+   but that was a side effect of a since-fixed bug elsewhere (the whole
+   screen was rendering white-on-white): every color value really did
+   produce the same shade, because there was no visible shade at all.
+   Confirmed working now (see vic20io.c), so cards get an actual suit
+   color as well as the explicit letter -- the letter stays too, since
+   it's still useful at a glance and costs nothing extra. Everything here
+   is deliberately terse: the VIC-20's screen is only 22 columns wide (a
+   hardware limit, not something memory expansion changes), so every
+   string length is hand-counted against that. */
 
 #define TITLE_Y 0
 #define OPP_Y 2
@@ -18,6 +20,15 @@
 #define MSG_Y2 9
 #define HAND_LABEL_Y 11
 #define HAND_Y 12
+
+static const unsigned char suit_color[4] = {COL_RED, COL_YELLOW, COL_GREEN, COL_BLUE};
+
+/* Wild cards sitting in hand have no assigned suit yet (only once played
+   and a color is chosen), so they get a neutral color instead of
+   indexing suit_color with COLOR_WILD. */
+static unsigned char card_color(unsigned char color) {
+    return (color == COLOR_WILD) ? COL_WHITE : suit_color[color];
+}
 
 static char color_letter(unsigned char color, unsigned char color_override) {
     if (color == COLOR_WILD) {
@@ -89,12 +100,12 @@ void ui_draw_table(GameState *g) {
     scr_put_num(6, TABLE_Y, g->draw_count, COL_WHITE);
 
     scr_puts(1, TABLE_Y + 1, "TOP:[", COL_WHITE);
-    scr_put(6, TABLE_Y + 1, color_letter(g->top_card.color, g->top_color), COL_WHITE);
-    scr_put(7, TABLE_Y + 1, value_char(g->top_card), COL_WHITE);
+    scr_put(6, TABLE_Y + 1, color_letter(g->top_card.color, g->top_color), suit_color[g->top_color]);
+    scr_put(7, TABLE_Y + 1, value_char(g->top_card), suit_color[g->top_color]);
     scr_puts(8, TABLE_Y + 1, "]", COL_WHITE);
 
     scr_puts(1, TABLE_Y + 2, "COL:", COL_WHITE);
-    scr_puts(5, TABLE_Y + 2, names[g->top_color], COL_WHITE);
+    scr_puts(5, TABLE_Y + 2, names[g->top_color], suit_color[g->top_color]);
     scr_puts(9, TABLE_Y + 2, g->direction > 0 ? "DIR:>" : "DIR:<", COL_WHITE);
 }
 
@@ -115,8 +126,8 @@ void ui_draw_hand(GameState *g, unsigned char cursor) {
         y = (unsigned char)(HAND_Y + i / 4);
         scr_put(x, y, i == cursor ? '[' : ' ', COL_WHITE);
         scr_put(x + 1, y, label_char(i), COL_WHITE);
-        scr_put(x + 2, y, color_letter(p->hand[i].color, NONE), COL_WHITE);
-        scr_put(x + 3, y, value_char(p->hand[i]), COL_WHITE);
+        scr_put(x + 2, y, color_letter(p->hand[i].color, NONE), card_color(p->hand[i].color));
+        scr_put(x + 3, y, value_char(p->hand[i]), card_color(p->hand[i].color));
         scr_put(x + 4, y, i == cursor ? ']' : ' ', COL_WHITE);
     }
 }
@@ -136,7 +147,7 @@ void ui_draw_color_picker(unsigned char selected) {
     for (i = 0; i < 4; i++) {
         x = 1 + i * 5;
         scr_put(x, MSG_Y2, selected == i ? '[' : ' ', COL_WHITE);
-        scr_puts(x + 1, MSG_Y2, names[i], COL_WHITE);
+        scr_puts(x + 1, MSG_Y2, names[i], suit_color[i]);
         scr_put(x + 4, MSG_Y2, selected == i ? ']' : ' ', COL_WHITE);
     }
 }

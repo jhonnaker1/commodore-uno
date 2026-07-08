@@ -2,10 +2,17 @@
 #define VIC20IO_H
 
 /* Confirmed empirically (via VICE's monitor) for the 32K-expansion memory
-   config: screen matrix at $1000, 22x23 visible. Color RAM is always
-   fixed at $9600 regardless of expansion. We use the stock KERNAL
-   character set (no relocation) -- same reasoning as the Plus/4 port. */
-#define SCREEN ((unsigned char *)0x1000)
+   config: the KERNAL relocates the screen matrix to $1000 by default, but
+   the real VIC-II chip has a genuine, reproducible rendering bug at that
+   address (large parts of a correct, in-memory screen just don't display,
+   independent of RAM amount or KERNAL). $1E00 -- the stock/unexpanded
+   default -- renders correctly, so vic20_init() redirects the VIC's
+   video-matrix registers back there instead of using the KERNAL's
+   relocated default. The linker config (vic20-highmem.cfg) deliberately
+   leaves $1000-$1FFF free of code/data so this is safe to write to. Color
+   RAM is always fixed at $9600 regardless of expansion. We use the stock
+   KERNAL character set (no relocation) -- same reasoning as the Plus/4 port. */
+#define SCREEN ((unsigned char *)0x1E00)
 #define COLOR ((unsigned char *)0x9600)
 #define COLS 22
 #define ROWS 23
