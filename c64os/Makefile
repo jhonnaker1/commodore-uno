@@ -35,8 +35,13 @@ JD_KERNAL_ROM := $(ROMDIR)/JiffyDOS_C64.bin
 
 C64EMU_EXTRAFLAGS := -controlport1device 3 -fslongnames
 C64EMU_ROMFLAGS := -kernal $(JD_KERNAL_ROM) -dosCMDHD $(CMDHD_ROM)
-C64EMU_MOUNTFLAGS := -busdevice8 -drive8type 0 -drive9type 4844 -fs8 $(DISTDIR) -9 $(OUTDIR)/c64os.dhd
-C64EMU_BOOTCMD := load \"c64os\",9\nrun\n
+# fs8 must point at the app bundle directory itself (about.t/main.o/menu.m
+# at the top level) -- pointing it at $(DISTDIR) instead exposed an extra
+# directory level plus the unrelated .d64 file sitting alongside it, which
+# confused C64 OS's own file browser when mounting device 8.
+# CMD HD is device 10, not 9 here -- 9 had trouble mounting in testing.
+C64EMU_MOUNTFLAGS := -busdevice8 -drive8type 0 -drive10type 4844 -fs8 $(DISTDIR)/$(APP_FULLNAME) -10 $(OUTDIR)/c64os.dhd
+C64EMU_BOOTCMD := load \"c64os\",10\nrun\n
 
 .PHONY: all dist d64 clean run help
 
@@ -66,6 +71,12 @@ $(ASM): $(DLDIR)/$(TMPX_VERSION)
 
 $(OUTDIR):
 	mkdir -p $@
+
+# main.o pulls in engine.s via .include, which make can't discover on its
+# own (no auto-dependency generation for TMP assembly) -- list it
+# explicitly so editing engine.s alone still triggers a rebuild.
+$(OUTDIR)/main.o: $(SRCDIR)/main.s $(SRCDIR)/engine.s $(ASM) | $(OUTDIR)
+	$(ASM) $(ASMFLAGS) -i $< -o $@
 
 $(OUTDIR)/%.o: $(SRCDIR)/%.s $(ASM) | $(OUTDIR)
 	$(ASM) $(ASMFLAGS) -i $< -o $@
