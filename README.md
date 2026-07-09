@@ -26,6 +26,7 @@ vary wildly across this lineup.
 | [`atari/`](atari) | Atari 800XL | Complete — standard ANTIC text mode (no per-cell color, so cards use color letters + reverse-video selection like the VIC-20/PET), 4-channel POKEY sound |
 | [`apple/`](apple) | Apple IIe (enhanced) | Complete — 40x24 text mode (no per-cell color, reverse-video selection like the VIC-20/PET/Atari), 1-bit speaker bit-banged for tones; ships as a ProDOS `.SYSTEM` file, see [`apple/`](apple) for how to get it onto a bootable disk image |
 | [`amiga/`](amiga) | Commodore Amiga (68000, Kickstart 2.0+) | Complete — a custom Intuition screen with a real 8-color palette (not the default Workbench screen's washed-out few shades) drawn through console.device with ANSI escape codes, 4-channel Paula sound with a generated sine-wave tone and volume envelope, keyboard input via IDCMP_VANILLAKEY (comma/period/'U' for movement instead of cursor keys — see Controls) |
+| [`cbm510/`](cbm510) | Commodore CBM-II (510/P500) | Complete — the one CBM-II model with a real VIC-II and SID (same chips as the C64, reached through cc65's `pokebsys()`/`peekbsys()` since they live in a separate bank-switched "system bank" plain pointers can't reach), full-color card borders and SID sound effects, same box-drawing charset as the C64/C128 (stock PETSCII, no custom chargen needed) |
 
 ## Building
 
@@ -43,6 +44,7 @@ cd vic20 && make run   # build/uno20.prg in xvic -memory all
 cd atari && make run XLXE_ROM=/path/to/your/atarixl.rom  # build/uno.xex in atari800
 cd apple && make      # build/uno.system -- see apple/ for the ProDOS disk-image step
 cd amiga && make      # build/uno -- needs m68k-amigaos-gcc on your PATH, see below
+cd cbm510 && make run # build/uno.prg in xcbm5x0
 ```
 
 `make` alone just builds; `make clean` removes build artifacts.
@@ -119,3 +121,17 @@ for its own unreachable dedicated cursor keys.
   neither `SA_Overscan=OSCAN_MAX` nor an explicit `SA_DClip` rectangle
   widened that in testing (both made it narrower), so `ui.c` just designs
   around the ~60-column safe area instead of the nominal 80.
+
+- **CBM-510**: unlike every other Commodore port here, `vid510.c`/
+  `snd510.c` never poke video/color RAM or SID registers directly. The
+  CBM-II's 6509 CPU is bank-switched, and those all live in a separate
+  "system bank" plain pointers can't reach -- direct pokes at the
+  documented addresses ($F000 screen, $D400 color RAM) never showed up on
+  screen, and probing that bank via VICE's monitor gave inconsistent
+  results. cc65's `conio.h` (`clrscr()`/`cputcxy()`/`textcolor()`) handles
+  the bank-switching correctly internally, so video goes through that
+  instead; SID sound uses `pokebsys()`/`peekbsys()` directly (confirmed
+  audible), since conio has no sound equivalent. `<cbm510.h>`'s own
+  `COLOR_RED`/`COLOR_YELLOW`/etc (the hardware palette) also collide with
+  `cards.h`'s suit-color constants of the same name, so `vid510.h`
+  hardcodes every color/character value instead of including it.
