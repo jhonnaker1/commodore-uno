@@ -27,6 +27,7 @@ vary wildly across this lineup.
 | [`apple/`](apple) | Apple IIe (enhanced) | Complete — 40x24 text mode (no per-cell color, reverse-video selection like the VIC-20/PET/Atari), 1-bit speaker bit-banged for tones; ships as a ProDOS `.SYSTEM` file, see [`apple/`](apple) for how to get it onto a bootable disk image |
 | [`amiga/`](amiga) | Commodore Amiga (68000, Kickstart 2.0+) | Complete — a custom Intuition screen with a real 8-color palette (not the default Workbench screen's washed-out few shades) drawn through console.device with ANSI escape codes, 4-channel Paula sound with a generated sine-wave tone and volume envelope, keyboard input via IDCMP_VANILLAKEY (comma/period/'U' for movement instead of cursor keys — see Controls) |
 | [`cbm510/`](cbm510) | Commodore CBM-II (510/P500) | Complete — the one CBM-II model with a real VIC-II and SID (same chips as the C64, reached through cc65's `pokebsys()`/`peekbsys()` since they live in a separate bank-switched "system bank" plain pointers can't reach), full-color card borders and SID sound effects, same box-drawing charset as the C64/C128 (stock PETSCII, no custom chargen needed) |
+| [`c64os/`](c64os) | Commodore 64, running [C64 OS](https://c64os.com/) | In progress — a real windowed C64 OS application (not a shortcut to the bare-metal `c64/` port), written in 6502 assembly against C64 OS's own TMP-syntax KERNAL, hand-assembled with the cross-platform TMPx assembler since it's a closed-source commercial OS with its own SDK, no C toolchain |
 
 ## Building
 
@@ -45,6 +46,7 @@ cd atari && make run XLXE_ROM=/path/to/your/atarixl.rom  # build/uno.xex in atar
 cd apple && make      # build/uno.system -- see apple/ for the ProDOS disk-image step
 cd amiga && make      # build/uno -- needs m68k-amigaos-gcc on your PATH, see below
 cd cbm510 && make run # build/uno.prg in xcbm5x0
+cd c64os && make run  # dist/uno_1.0.d64 in x64sc, booting C64 OS -- see c64os/ below
 ```
 
 `make` alone just builds; `make clean` removes build artifacts.
@@ -135,3 +137,24 @@ for its own unreachable dedicated cursor keys.
   `COLOR_RED`/`COLOR_YELLOW`/etc (the hardware palette) also collide with
   `cards.h`'s suit-color constants of the same name, so `vid510.h`
   hardcodes every color/character value instead of including it.
+
+- **C64 OS**: unlike every other port here, this isn't cc65/C at all -- C64
+  OS is a closed-source, commercial GUI operating system for the C64 with
+  its own KERNAL, windowing system, and menu bar, and applications are
+  written in 6502 assembly against its own TMP-syntax SDK (vendored,
+  MIT-licensed, under `inc/os/`, from
+  [OpCoders-Inc/c64os-dev](https://github.com/OpCoders-Inc/c64os-dev)).
+  The officially-recommended assembler, TurboMacroPro, only runs natively
+  *inside* C64 OS itself; cross-assembling from macOS/Linux needs its
+  cross-platform sibling, TMPx (`c64os/Makefile` downloads it
+  automatically -- there's no native arm64 build, but the Intel macOS one
+  runs fine under Rosetta 2). TMPx resolves `.include` paths relative to
+  the *current directory*, not its `-I` flag, despite `-I` existing and
+  looking like it should work -- `c64os/os` is a symlink to `c64os/inc/os`
+  purely so `.include "os/h/whatever.h"` resolves from the project root,
+  matching the same workaround in the upstream
+  [c64os-example-app](https://github.com/woodrowbarlow/c64os-example-app)
+  this port's build pipeline is based on. Testing requires your own
+  purchased copy of C64 OS (`c64os/rom/c64os.dhd`) and a CMD HD Boot ROM
+  (`c64os/rom/cmd_hd_bootrom.bin`), neither of which is included here --
+  see `c64os/README.md`.

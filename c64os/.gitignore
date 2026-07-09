@@ -1,0 +1,7 @@
+.env/
+dl/
+out/
+dist/
+bin/
+rom/
+__pycache__/
