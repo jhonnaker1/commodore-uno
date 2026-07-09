@@ -1,15 +1,19 @@
 # Commodore UNO
 
 UNO for classic 8-bit machines (mostly Commodore, plus one Atari, one
-Apple, and one 16/32-bit Amiga): 1 human player vs. 3 CPU opponents, full
-rules (Skip, Reverse, Draw Two, Wild, Wild Draw Four with challenge). The
-8-bit ports are written in C against the [cc65](https://cc65.github.io/)
-6502 toolchain and tested in [VICE](https://vice-emu.sourceforge.io/)
-(Commodore), [Atari800](https://atari800.github.io/) (Atari), and
+Apple, one Sinclair, and one 16/32-bit Amiga): 1 human player vs. 3 CPU
+opponents, full rules (Skip, Reverse, Draw Two, Wild, Wild Draw Four with
+challenge). Most of the 6502-based ports are written in C against the
+[cc65](https://cc65.github.io/) toolchain and tested in
+[VICE](https://vice-emu.sourceforge.io/) (Commodore),
+[Atari800](https://atari800.github.io/) (Atari), and
 [MAME](https://www.mamedev.org/) (Apple II). The Amiga port is a
 completely different CPU architecture (68000, not 6502), built with
 [bebbo's amiga-gcc](https://github.com/AmigaPorts/m68k-amigaos-gcc) and
-tested in [FS-UAE](https://fs-uae.net/).
+tested in [FS-UAE](https://fs-uae.net/). The ZX Spectrum port is a
+different CPU family again (Z80, not 6502), built with
+[z88dk](https://github.com/z88dk/z88dk) and tested in MAME's `spectrum`
+driver.
 
 Each platform is its own self-contained subdirectory sharing the same card
 game logic (`cards.c/h`, `game.c/h`, `ai.c/h`) with a platform-specific
@@ -28,6 +32,7 @@ vary wildly across this lineup.
 | [`amiga/`](amiga) | Commodore Amiga (68000, Kickstart 2.0+) | Complete — a custom Intuition screen with a real 8-color palette (not the default Workbench screen's washed-out few shades) drawn through console.device with ANSI escape codes, 4-channel Paula sound with a generated sine-wave tone and volume envelope, keyboard input via IDCMP_VANILLAKEY (comma/period/'U' for movement instead of cursor keys — see Controls) |
 | [`cbm510/`](cbm510) | Commodore CBM-II (510/P500) | Complete — the one CBM-II model with a real VIC-II and SID (same chips as the C64, reached through cc65's `pokebsys()`/`peekbsys()` since they live in a separate bank-switched "system bank" plain pointers can't reach), full-color card borders and SID sound effects, same box-drawing charset as the C64/C128 (stock PETSCII, no custom chargen needed) |
 | [`c64os/`](c64os) | Commodore 64, running [C64 OS](https://c64os.com/) | In progress — a real windowed C64 OS application (not a shortcut to the bare-metal `c64/` port), written in 6502 assembly against C64 OS's own TMP-syntax KERNAL, hand-assembled with the cross-platform TMPx assembler since it's a closed-source commercial OS with its own SDK, no C toolchain |
+| [`zxspectrum/`](zxspectrum) | Sinclair ZX Spectrum 48K | Complete — Z80 (not 6502) via z88dk; 32x24 text over a bitmap with per-8x8-cell ink/paper color (the classic "attribute clash"), cards shown as bracketed color-letter labels like the VIC-20/PET/Atari ports, `O`/`P`/`Q` "keys as joystick" scheme since a real Spectrum has no cursor keys, 1-bit beeper sound |
 
 ## Building
 
@@ -47,6 +52,7 @@ cd apple && make      # build/uno.system -- see apple/ for the ProDOS disk-image
 cd amiga && make      # build/uno -- needs m68k-amigaos-gcc on your PATH, see below
 cd cbm510 && make run # build/uno.prg in xcbm5x0
 cd c64os && make run  # dist/uno_1.0.d64 in x64sc, booting C64 OS -- see c64os/ below
+cd zxspectrum && make Z88DK_DIR=/path/to/z88dk run  # build/uno.sna in MAME's spectrum driver
 ```
 
 `make` alone just builds; `make clean` removes build artifacts.
@@ -158,3 +164,19 @@ for its own unreachable dedicated cursor keys.
   purchased copy of C64 OS (`c64os/rom/c64os.dhd`) and a CMD HD Boot ROM
   (`c64os/rom/cmd_hd_bootrom.bin`), neither of which is included here --
   see `c64os/README.md`.
+
+- **ZX Spectrum**: another non-6502/non-cc65 port, this time Z80 via
+  z88dk. Builds straight to an `.sna` snapshot instead of a `.tap` tape
+  image so MAME can load it instantly with `-snapshot` -- typing `LOAD`
+  as literal ASCII into a `.tap` autoboot doesn't work the way you'd
+  expect, since Sinclair BASIC's keyboard is tokenized (the `J` key alone
+  produces the whole word `LOAD` in command mode) and MAME's natural
+  keyboard autotype doesn't account for that, so it ends up typing
+  `LET OAD` instead of loading anything. `wait_vsync()` originally polled
+  the ROM's `FRAMES` system variable the standard way (updated by its
+  50Hz interrupt handler), but enabling interrupts crashed within a few
+  frames -- the C runtime's stack apparently isn't laid out somewhere
+  safe for the ROM's interrupt handler to push onto -- so it paces with
+  z88dk's `in_pause()` busy-wait instead, which never touches interrupt
+  state. See `zxspectrum/README.md` for the rest (attribute-clash color
+  handling, the keys-as-joystick control scheme).
