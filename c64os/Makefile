@@ -33,7 +33,7 @@ C64OS_DHD := $(ROMDIR)/c64os.dhd
 CMDHD_ROM := $(ROMDIR)/cmd_hd_bootrom.bin
 JD_KERNAL_ROM := $(ROMDIR)/JiffyDOS_C64.bin
 
-C64EMU_EXTRAFLAGS := -controlport1device 3 -fslongnames
+C64EMU_EXTRAFLAGS := -controlport1device 3 -fslongnames -reu -reusize 16384
 C64EMU_ROMFLAGS := -kernal $(JD_KERNAL_ROM) -dosCMDHD $(CMDHD_ROM)
 # fs8 must point at the app bundle directory itself (about.t/main.o/menu.m
 # at the top level) -- pointing it at $(DISTDIR) instead exposed an extra
@@ -41,7 +41,13 @@ C64EMU_ROMFLAGS := -kernal $(JD_KERNAL_ROM) -dosCMDHD $(CMDHD_ROM)
 # confused C64 OS's own file browser when mounting device 8.
 # CMD HD is device 10, not 9 here -- 9 had trouble mounting in testing.
 C64EMU_MOUNTFLAGS := -busdevice8 -drive8type 0 -drive10type 4844 -fs8 $(DISTDIR)/$(APP_FULLNAME) -10 $(OUTDIR)/c64os.dhd
-C64EMU_BOOTCMD := load \"c64os\",10\nrun\n
+# Auto-types (via VICE's -keybuf, i.e. actual simulated keystrokes at the
+# plain BASIC READY prompt, before C64 OS is loaded) a JiffyDOS @ wedge
+# copy of the freshly-built main.o from device 8 onto the already-installed
+# app at //os/applications/uno/ on the CMD HD, then boots C64 OS -- so a
+# fresh VICE launch tests the latest build without a manual copy step.
+# Assumes the app was already installed there once (see c64os/README.md).
+C64EMU_BOOTCMD := @cd//os/applications/uno\n@c0:main.o=8:main.o\nload \"c64os\",10\nrun\n
 
 .PHONY: all dist d64 clean run help
 
@@ -108,7 +114,12 @@ d64: $(DISTDIR)/$(APP_FULLNAME).d64
 clean:
 	rm -rf $(OUTDIR) $(DISTDIR)
 
-run: d64 $(OUTDIR)/c64os.dhd $(CMDHD_ROM)
+# fs8 mounts $(DISTDIR)/$(APP_FULLNAME) directly as a live host-filesystem
+# passthrough, so there's no need to rebuild a .d64 for day-to-day testing --
+# `make dist` alone refreshes the files VICE already has mounted on device 8;
+# no need to restart the emulator, just re-copy them onto the installed app
+# from within a running C64 OS session.
+run: dist $(OUTDIR)/c64os.dhd $(CMDHD_ROM)
 	$(C64EMU) -default \
 	  $(C64EMU_ROMFLAGS) $(C64EMU_EXTRAFLAGS) \
 	  $(C64EMU_MOUNTFLAGS) -keybuf "$(C64EMU_BOOTCMD)"
