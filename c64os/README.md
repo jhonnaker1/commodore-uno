@@ -9,16 +9,17 @@ its own event-driven input API. It's written in 6502 assembly against
 C64 OS's TMP-syntax SDK, since C64 OS predates (and isn't compatible with)
 the cc65/C toolchain every other port in this repo uses.
 
-Status: in progress. Boots into a real C64 OS window with a working
-"Game" menu (New Game / Quit), real keyboard input (`kprntevt`, verified
-moving an on-screen marker), and the full game engine (`src/engine.s`
--- deck build/shuffle, deal, turn advancement, Skip/Reverse/DrawTwo/Wild/
-Wild Draw Four incl. challenge, CPU AI), hand-ported to 6502 assembly
-from the shared `cards.c`/`game.c`/`ai.c` every other port in this repo
-uses. Verified via a debug readout that a fresh deal gives 7 cards per
-hand and the right draw pile count. Not wired up yet: the real card/hand/
-table UI (currently just a debug number readout) and the actual
-play/draw turn loop -- that's the next piece of work.
+Status: complete and verified playable end-to-end in VICE. A real C64 OS
+window with a working "Game" menu (New Game / Quit), real per-card-color
+hand/table rendering, and the full turn loop -- dealing, playing,
+drawing, Skip/Reverse/Draw Two, Wild with a color picker, Wild Draw Four
+with a challenge prompt, and CPU turns -- all backed by `src/engine.s`
+(deck build/shuffle, deal, turn advancement, full rules, CPU AI),
+hand-ported to 6502 assembly from the shared `cards.c`/`game.c`/`ai.c`
+every other port in this repo uses, since C64 OS has no C toolchain at
+all. See the Notes section below for some real bugs found along the way
+(a `setdprops` register-clobber, a deterministic-first-draw quirk) that
+are worth knowing about if you're extending this further.
 
 ## Requirements
 
@@ -106,13 +107,36 @@ command from a BASIC/terminal prompt if you have one open).
   the OS delivers it there directly but that isn't independently
   documented anywhere else. Verified working: cursor left/right move an
   on-screen test marker.
-- CPU turn pacing doesn't use a busy-wait loop the way every cc65 port's
-  `pause_frames()` does -- C64 OS's event loop watches for unresponsive
-  apps and animates a "CPU busy" warning if it doesn't get called every
-  couple seconds, so a real delay needs the KERNAL's timer module
-  (`timeque_`, an app-supplied trigger routine + countdown struct) rather
-  than blocking. Not wired up yet; CPU turns currently resolve instantly
-  with no "thinking" pause.
+- CPU turn pacing doesn't use the KERNAL's timer module (`timeque_`, an
+  app-supplied trigger routine + countdown struct) the way a proper C64 OS
+  app should for anything that isn't instant. `markredraw_` alone also
+  isn't enough to make each CPU turn visible -- it only *schedules* a
+  redraw for the OS's next event-loop pass, which never arrives while
+  code is still executing inside a tight loop like the CPU-turn cascade
+  in `after_action`. Fixed for now with a blocking `jsr drawmain` (forces
+  an immediate synchronous redraw) plus a simple busy-wait
+  (`busy_wait_short`, ~0.6s) between turns, both called directly from
+  `after_action`/`aa_chkturn` and `aa_ai_wd4`. Good enough to make CPU
+  turns readable, but a real timer-based approach would be more correct
+  and OS-idiomatic if this app grows further.
+- `setdprops_` does not preserve `.A` (only `ctxdraw_` is documented to
+  preserve X/Y). Loading the character to draw into `.A` and *then*
+  calling `setdprops_` before `ctxdraw_` silently corrupts the character
+  -- caught via a garbled `[` rendering as the unrelated opcode byte
+  `$B9` in the color picker. Every draw call site in `main.s` now calls
+  `setdprops_` first, then loads `.A`, then `ctxdraw_`.
+- `game_new`'s reject-handling (skipping action/wild cards while picking
+  the initial discard, same logic as the shared `game.c`) appends
+  rejected cards back onto the draw pile in rejection order, so the
+  last-rejected card is deterministically the very first card anyone
+  draws, every game. Every cc65 port shares this property in `game.c`,
+  but it's far more visible here since this port's RNG has no jiffy-clock
+  busy-wait to seed from (see the packed-card note below) -- it showed up
+  as "pressing up to draw a card plays a Wild Draw Four" on turn one,
+  always. Fixed locally in `src/engine.s` only (per an explicit decision
+  not to touch the shared `game.c` other ports depend on) by adding one
+  more `deck_shuffle` pass over the draw pile after rejects are pushed
+  back, in `game_new`.
 - `src/engine.s` packs each card into a single byte (`color<<4|value`)
   rather than the two-byte struct every cc65 port uses, and stores all
   four players' hands as one contiguous 160-byte array (`player_hands`,
