@@ -43,6 +43,30 @@ drawctx  .word scrbuf      ;Char Origin
          .word 0           ;Offset Top
          .word 0           ;Offset Left
 
+;Private off-screen copy of the whole layer, screen_cols*screen_rows
+;(40*25=1000) bytes each. All the draw_* routines render into this via
+;layerctx, same as they always drew straight into scrbuf/colbuf -- they
+;go through setctx/d_ctx either way, so none of that code had to change.
+;Only actually re-rendered when needs_redraw is set; otherwise drawmain
+;just blits the already-correct buffer over to the real screen, which is
+;the expensive part (dozens of ctxdraw_ calls) that used to re-run on
+;every single redraw, including ones like closing a menu where nothing
+;in the game actually changed.
+needs_redraw .byte 1
+
+layerctx .word layer_chars ;Char Origin
+         .word layer_colors ;Colr Origin
+         .byte screen_cols
+         .byte screen_cols
+         .byte screen_rows
+         .word 0
+         .word 0
+
+layer_chars
+         *= *+1000
+layer_colors
+         *= *+1000
+
 title_s   .null "uno"
 sub_s     .null "a real c64 os application"
 hint_s    .null "press space for a new game"
@@ -294,6 +318,8 @@ hhk_doplay
 
 hhk_redraw
          ldx #0
+         lda #1
+         sta needs_redraw
          jsr markredraw
          rts
          .bend
@@ -377,6 +403,8 @@ dda_autoplay
          lda #0
          sta color_sel
          ldx #0
+         lda #1
+         sta needs_redraw
          jsr markredraw
          rts
 
@@ -405,6 +433,8 @@ try_play_selected
          lda #1
          sta invalid_flash
          ldx #0
+         lda #1
+         sta needs_redraw
          jsr markredraw
          rts
 
@@ -427,6 +457,8 @@ tps_legal
          lda #0
          sta color_sel
          ldx #0
+         lda #1
+         sta needs_redraw
          jsr markredraw
          rts
 
@@ -485,6 +517,8 @@ hck_confirm
 
 hck_redraw
          ldx #0
+         lda #1
+         sta needs_redraw
          jsr markredraw
          rts
          .bend
@@ -510,6 +544,8 @@ hxk_toggle
          eor #1
          sta challenge_sel
          ldx #0
+         lda #1
+         sta needs_redraw
          jsr markredraw
          rts
 
@@ -551,6 +587,8 @@ aa_ai_wd4
          jsr resolve_wd4
          lda #1
          sta ui_state
+         lda #1
+         sta needs_redraw
          jsr drawmain
          jsr busy_wait_short
          jmp aa_loop
@@ -561,6 +599,8 @@ aa_chkturn
          jsr cpu_take_turn
          lda #1
          sta ui_state
+         lda #1
+         sta needs_redraw
          jsr drawmain
          jsr busy_wait_short
          jmp aa_loop
@@ -578,6 +618,8 @@ aa_human
 
 aa_redraw
          ldx #0
+         lda #1
+         sta needs_redraw
          jsr markredraw
          rts
          .bend
@@ -667,6 +709,8 @@ start_new_game
          sta invalid_flash
          lda #1
          sta ui_state
+         lda #1
+         sta needs_redraw
          jsr drawmain
          rts
          .bend
@@ -858,23 +902,81 @@ lc_ge10
 
 drawmain
          .block
-         #ldxy drawctx
+         lda needs_redraw
+         beq dm_blit
+
+         #ldxy layerctx
          jsr setctx
 
          lda ui_state
          bne dm_ingame
          jsr draw_title_screen
-         rts
+         jmp dm_donedraw
 
 dm_ingame
          lda ui_state
          cmp #4
          beq dm_gameover
          jsr draw_game_screen
-         rts
+         jmp dm_donedraw
 
 dm_gameover
          jsr draw_game_over_screen
+
+dm_donedraw
+         lda #0
+         sta needs_redraw
+
+dm_blit
+         jsr blit_layer_to_screen
+         rts
+         .bend
+
+;Raw memory copy of the just-rendered layer buffer onto the real screen
+;-- 1000 bytes is over Y's 8-bit range, so it's split into 4 chunks of
+;250 (1000/250 divides evenly) rather than dealing with a 16-bit counter.
+blit_layer_to_screen
+         .block
+         ldy #0
+blc_loop1
+         lda layer_chars,y
+         sta scrbuf,y
+         lda layer_colors,y
+         sta colbuf,y
+         iny
+         cpy #250
+         bne blc_loop1
+
+         ldy #0
+blc_loop2
+         lda layer_chars+250,y
+         sta scrbuf+250,y
+         lda layer_colors+250,y
+         sta colbuf+250,y
+         iny
+         cpy #250
+         bne blc_loop2
+
+         ldy #0
+blc_loop3
+         lda layer_chars+500,y
+         sta scrbuf+500,y
+         lda layer_colors+500,y
+         sta colbuf+500,y
+         iny
+         cpy #250
+         bne blc_loop3
+
+         ldy #0
+blc_loop4
+         lda layer_chars+750,y
+         sta scrbuf+750,y
+         lda layer_colors+750,y
+         sta colbuf+750,y
+         iny
+         cpy #250
+         bne blc_loop4
+
          rts
          .bend
 
