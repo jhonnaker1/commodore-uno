@@ -791,6 +791,18 @@ gn_pushloop
          jmp gn_pushloop
 gn_pushdone
 
+         ;Rejected cards just got appended to draw_pile in the order
+         ;they were flipped past -- meaning the LAST one rejected (the
+         ;one closest to the top of the pile) would deterministically
+         ;be the very first card anyone draws, every game. The shared
+         ;cc65 game.c every other port uses has this same property, but
+         ;it's easy to hit here since RNG entropy is weaker (no jiffy-
+         ;clock busy-wait to seed from -- see README). One more shuffle
+         ;pass over the whole pile fixes it without touching the
+         ;shared C logic other platforms rely on.
+         lda draw_count
+         jsr deck_shuffle
+
          lda #0
          sta current_player
          lda #1
