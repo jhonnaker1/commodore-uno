@@ -34,13 +34,34 @@ make Z88DK_DIR=/path/to/z88dk run   # boots it in MAME's spectrum driver
   Snapshots sidestep the whole problem.
 - The screen is 32x24 text over a bitmap, with colour applied per 8x8
   attribute cell (one ink + one paper colour per cell -- the classic
-  Spectrum "attribute clash"). There's no per-cell colour independent of
-  the glyph and no `cputcxy()`-style direct API; z88dk drives the screen
-  through `stdio` with control codes embedded in the string
+  Spectrum "attribute clash"). That clash is a sub-cell bitmap-graphics
+  problem though: in plain text, one character IS one attribute cell, so
+  ink can be set per character with no clash at all. z88dk drives the
+  screen through `stdio` with control codes embedded in the string
   (`\x10`=INK, `\x11`=PAPER, `\x14`=INVERSE, `\x16`=AT for position).
   Cards are shown as bracketed `[label:COLORLETTER+VALUE]` (same trick as
-  the VIC-20/PET/Atari ports) rather than true per-cell colour, and
-  selection uses INVERSE instead of a colour change.
+  the VIC-20/PET/Atari ports -- no redefinable character generator here
+  either, so no custom card-shaped tiles like the C64 port), but the
+  bracket/letter/value are drawn in the card's real suit colour, not a
+  single ink -- same upgrade as the CoCo 3 port's real per-suit colour.
+  The cursor position uses a dedicated highlight colour instead of the
+  card's own colour, so it stays visible regardless of suit (INVERSE's
+  old role).
+- Sending only `\x10` (INK) left every printed character sitting on
+  whatever paper the console driver defaults newly-printed text to --
+  which turned out to be white, regardless of what `zx_cls()` filled the
+  background with (that only affects untouched cells, not ones a later
+  print touches). White ink text was then genuinely invisible against
+  that default white paper: every "normal"-coloured line rendered as a
+  solid-looking block instead of readable text, while the differently-
+  coloured card letters (which don't collide with white) looked fine --
+  the giveaway that pointed at paper, not ink, being the actual bug.
+  Fixed by sending `\x11` (PAPER, forced to black) on every colour
+  change alongside `\x10`, not just once during `zx_cls()`. Background
+  is `PAPER_BLACK` now instead of `PAPER_WHITE` for the same reason the
+  CoCo 3 port's background stays fixed at a dark colour: yellow ink (one
+  of the four suit colours) is close to unreadable against a white or
+  light background.
 - No dedicated cursor keys exist on a real Spectrum keyboard, and 1-9/0
   are already the quick-play keys (same convention as every other port
   here), so movement uses the classic `O`/`P`/`Q` "keys as joystick"
