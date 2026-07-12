@@ -31,6 +31,19 @@
 
 void vic_init(void);
 void wait_vsync(void);
+
+/* Sprite 0 is reserved for the "card toss" animation; sprite data lives at
+   $8800, right after the screen's 1K block ($8400-$87FF) and well clear
+   of the charset at $A000 -- unlike the C64 port's $9000 (right after its
+   charset), C128's screen and charset aren't adjacent, so there's no
+   single "right after the previous block" spot that works for both;
+   $8800 was picked because it's the first free byte after the screen. */
+void sprite_enable(unsigned char on);
+void sprite_set_color(unsigned char color);
+void sprite_set_pos(unsigned int x, unsigned char y);
+unsigned int sprite_x_from_col(unsigned char col);
+unsigned char sprite_y_from_row(unsigned char row);
+void vic_set_border(unsigned char color);
 void scr_clear(void);
 void scr_put(unsigned char x, unsigned char y, unsigned char ch, unsigned char color);
 void scr_puts(unsigned char x, unsigned char y, const char *s, unsigned char color);

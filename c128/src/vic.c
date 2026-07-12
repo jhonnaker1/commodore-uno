@@ -9,6 +9,27 @@
 #define VIC_MCM (*(unsigned char *)0xD016)
 #define VIC_RASTER (*(unsigned char *)0xD012)
 
+#define VIC_SPR0_X (*(unsigned char *)0xD000)
+#define VIC_SPR0_Y (*(unsigned char *)0xD001)
+#define VIC_SPR_MSB (*(unsigned char *)0xD010)
+#define VIC_SPR_ENABLE (*(unsigned char *)0xD015)
+#define VIC_SPR0_COLOR (*(unsigned char *)0xD027)
+
+#define SPRITE_DATA_ADDR 0x8800
+
+/* A simple filled card silhouette, 24x21, corners trimmed on the first/last
+   rows. Color is set per-use to match whatever card is being tossed. */
+static const unsigned char sprite_data[63] = {
+    0x00, 0x00, 0x00,
+    0x0F, 0xFF, 0xF0,
+    0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC,
+    0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC,
+    0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC,
+    0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC, 0x3F, 0xFF, 0xFC,
+    0x0F, 0xFF, 0xF0,
+    0x00, 0x00, 0x00
+};
+
 /* KERNAL zero-page screen-editor variables (same layout as C64): PNT
    (current screen line address, lo/hi) and PNTR (cursor column). */
 #define KERNAL_PNT_LO (*(unsigned char *)0xD1)
@@ -68,7 +89,48 @@ void vic_init(void) {
     KERNAL_PNT_HI = (unsigned char)((unsigned int)SCREEN >> 8);
     KERNAL_PNTR = 0;
 
+    memcpy((void *)SPRITE_DATA_ADDR, sprite_data, 63);
+    /* Sprite pointer bytes live at the end of the 1K screen block VIC-II
+       expects (screen base + $3F8..$3FF), even though we only use 1000 of
+       those 1024 bytes for the visible 40x25 matrix. */
+    SCREEN[0x3F8] = (unsigned char)((SPRITE_DATA_ADDR - 0x8000) / 64);
+    VIC_SPR_ENABLE = 0;
+
     scr_clear();
+}
+
+void sprite_enable(unsigned char on) {
+    if (on) {
+        VIC_SPR_ENABLE |= 0x01;
+    } else {
+        VIC_SPR_ENABLE &= (unsigned char)~0x01;
+    }
+}
+
+void sprite_set_color(unsigned char color) {
+    VIC_SPR0_COLOR = color;
+}
+
+void sprite_set_pos(unsigned int x, unsigned char y) {
+    VIC_SPR0_X = (unsigned char)(x & 0xFF);
+    if (x > 255) {
+        VIC_SPR_MSB |= 0x01;
+    } else {
+        VIC_SPR_MSB &= (unsigned char)~0x01;
+    }
+    VIC_SPR0_Y = y;
+}
+
+unsigned int sprite_x_from_col(unsigned char col) {
+    return 24 + (unsigned int)col * 8;
+}
+
+unsigned char sprite_y_from_row(unsigned char row) {
+    return (unsigned char)(50 + (unsigned int)row * 8);
+}
+
+void vic_set_border(unsigned char color) {
+    VIC_BORDER = color;
 }
 
 void scr_clear(void) {

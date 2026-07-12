@@ -25,4 +25,19 @@ void ui_event_invalid(void);
 void ui_event_drew_one(unsigned char idx);
 void ui_event_thinking(unsigned char idx);
 
+/* Screen-cell positions used to aim the card-toss sprite animation. */
+void ui_hand_card_pos(unsigned char index, unsigned char *col, unsigned char *row);
+void ui_draw_pile_pos(unsigned char *col, unsigned char *row);
+void ui_top_card_pos(unsigned char *col, unsigned char *row);
+void ui_opponent_pos(unsigned char idx, unsigned char *col, unsigned char *row);
+unsigned char ui_suit_color(unsigned char color);
+
+/* Toggles just the "[" "]" bracket cells around the selection cursor,
+   without touching the rest of the hand grid (cheap enough to call twice a
+   second without any visible redraw flicker). */
+void ui_blink_cursor(unsigned char cursor, unsigned char on);
+
+/* Small palette flourish for the win screen (cycles the border color). */
+void ui_win_flourish_step(unsigned char step);
+
 #endif

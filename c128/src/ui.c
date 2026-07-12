@@ -151,6 +151,15 @@ static char label_char(unsigned char idx) {
    chunk of work off the game's single heaviest screen update). */
 static unsigned char prev_had_row2 = 0;
 
+/* Only pokes the two bracket cells directly, no full-grid redraw, so this
+   is cheap and flicker-free to call on a blink timer. */
+void ui_blink_cursor(unsigned char cursor, unsigned char on) {
+    unsigned char x = 1 + (cursor % 10) * 4;
+    unsigned char label_y = (cursor < 10) ? LABEL1_Y : LABEL2_Y;
+    scr_put(x, label_y, on ? '[' : 32, COL_YELLOW);
+    scr_put(x + 2, label_y, on ? ']' : 32, COL_YELLOW);
+}
+
 void ui_draw_hand(GameState *g, unsigned char cursor) {
     Player *p = &g->players[0];
     unsigned char i, x, y, label_y, shown;
@@ -311,4 +320,37 @@ void ui_game_over_screen(unsigned char human_won, unsigned char winner_idx) {
         scr_puts(17, 10, "WINS", COL_WHITE);
     }
     scr_puts(9, 20, "PRESS FIRE TO PLAY AGAIN", COL_CYAN);
+}
+
+void ui_hand_card_pos(unsigned char index, unsigned char *col, unsigned char *row) {
+    *col = 1 + (index % 10) * 4;
+    *row = (index < 10) ? HAND_Y : HAND2_Y;
+}
+
+void ui_draw_pile_pos(unsigned char *col, unsigned char *row) {
+    *col = DRAW_X;
+    *row = CARD_Y;
+}
+
+void ui_top_card_pos(unsigned char *col, unsigned char *row) {
+    *col = TOP_X;
+    *row = CARD_Y;
+}
+
+void ui_opponent_pos(unsigned char idx, unsigned char *col, unsigned char *row) {
+    *col = 2 + (idx - 1) * 13;
+    *row = OPP_Y;
+}
+
+unsigned char ui_suit_color(unsigned char color) {
+    if (color > COLOR_BLUE) return COL_LTGRAY;
+    return suit_color[color];
+}
+
+static const unsigned char flourish_colors[8] = {
+    COL_RED, COL_ORANGE, COL_YELLOW, COL_GREEN, COL_CYAN, COL_BLUE, COL_PURPLE, COL_WHITE
+};
+
+void ui_win_flourish_step(unsigned char step) {
+    vic_set_border(flourish_colors[step & 7]);
 }

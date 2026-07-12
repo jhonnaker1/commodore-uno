@@ -23,19 +23,19 @@ static unsigned char handle_post_play_flags(GameState *g) {
     if (g->flag_skip != NONE) {
         wait_vsync();
         ui_event_skip(g->flag_skip);
-        sfx_turn();
+        sfx_skip();
         pause_frames(70);
     }
     if (g->flag_reverse != NONE) {
         wait_vsync();
         ui_event_reverse(g->flag_reverse);
-        sfx_turn();
+        sfx_reverse();
         pause_frames(60);
     }
     if (g->flag_draw_player != NONE) {
         wait_vsync();
         ui_event_draw(g->flag_draw_player, g->flag_draw_count);
-        sfx_draw();
+        sfx_draw_multi(g->flag_draw_count);
         pause_frames(80);
     }
     if (g->flag_uno_player != NONE) {
@@ -81,7 +81,11 @@ static unsigned char resolve_pending_wd4(GameState *g) {
         resolve_wd4(g, challenged);
         wait_vsync();
         ui_event_challenge_result(g->wd4_victim, g->wd4_player, succeeded);
-        sfx_turn();
+        if (succeeded) {
+            sfx_challenge_success();
+        } else {
+            sfx_challenge_fail();
+        }
         ui_draw_opponents(g);
         ui_draw_hand(g, 0);
         pause_frames(90);

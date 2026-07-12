@@ -4,6 +4,7 @@
 #define VDC_CTRL (*(volatile unsigned char *)0xD600)
 #define VDC_DATA (*(volatile unsigned char *)0xD601)
 #define VIC_RASTER (*(unsigned char *)0xD012)
+#define C128_CLKRATE (*(unsigned char *)0xD030)
 
 static void wait_ready(void) {
     while (!(VDC_CTRL & 0x80)) {}
@@ -125,6 +126,23 @@ void vdc_init(void) {
         for (k = 0; k < 8; k++) vdc_data_write(0);
     }
     __asm__("cli");
+
+    /* This build is entirely VDC-driven, so the VIC-IIe's own picture
+       being unwatchable in 2MHz mode (well-documented: the VIC-II can't
+       fetch character/color data coherently at 2x speed, scrambling
+       whatever it displays) doesn't matter -- nobody's looking at it.
+       What did need checking was whether that scrambling extends to the
+       raster *register* wait_vsync() reads for pacing, since a broken
+       counter would break frame timing project-wide, not just the
+       picture: confirmed empirically (a standalone test sampling D012
+       before/after) that it keeps incrementing normally and wrapping
+       0-311 either way. Safe to leave on for the whole session -- no
+       matching "back to 1MHz" anywhere, since C128 BASIC itself runs
+       fine at 2MHz and this program never returns to it.
+       Bit 0 of $D030 (undefined/reserved on a real C64, which is why
+       this register is C128-specific) is the only bit this touches;
+       the rest are left alone. */
+    C128_CLKRATE |= 0x01;
 
     scr_clear();
 }

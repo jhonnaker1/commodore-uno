@@ -14,6 +14,63 @@ static void pause_frames(unsigned int n) {
     while (n--) wait_vsync();
 }
 
+/* Animates sprite 0 flying between two hand/table slots, in the given
+   color, then hides it again. */
+static void animate_toss_to(unsigned char from_col, unsigned char from_row,
+                             unsigned char to_col, unsigned char to_row, unsigned char color) {
+    unsigned char step;
+    int x0, y0, x1, y1, dx, dy, x, y;
+
+    x0 = (int)sprite_x_from_col(from_col + 1);
+    y0 = (int)sprite_y_from_row(from_row + 1);
+    x1 = (int)sprite_x_from_col(to_col + 1);
+    y1 = (int)sprite_y_from_row(to_row + 1);
+    dx = x1 - x0;
+    dy = y1 - y0;
+
+    sprite_set_color(color);
+    sprite_set_pos((unsigned int)x0, (unsigned char)y0);
+    sprite_enable(1);
+
+    for (step = 1; step <= 8; step++) {
+        x = x0 + (dx * (int)step) / 8;
+        y = y0 + (dy * (int)step) / 8;
+        sprite_set_pos((unsigned int)x, (unsigned char)y);
+        wait_vsync();
+    }
+
+    sprite_enable(0);
+}
+
+/* Convenience wrapper: toss from a slot to wherever the top-of-discard card
+   currently sits, for the common "card played" case. */
+static void animate_toss(unsigned char from_col, unsigned char from_row, unsigned char color) {
+    unsigned char to_col, to_row;
+    ui_top_card_pos(&to_col, &to_row);
+    animate_toss_to(from_col, from_row, to_col, to_row, color);
+}
+
+/* Deals the human's hand out visually, one card at a time, animating each
+   from the draw pile into its hand slot. game_new() has already dealt the
+   real data; this only controls how it's revealed on screen. */
+static void animate_deal(GameState *g) {
+    unsigned char full_count = g->players[0].count;
+    unsigned char i, col, row, dcol, drow;
+
+    ui_draw_pile_pos(&dcol, &drow);
+
+    for (i = 0; i < full_count; i++) {
+        ui_hand_card_pos(i, &col, &row);
+        animate_toss_to(dcol, drow, col, row, COL_CYAN);
+        sfx_draw();
+        g->players[0].count = (unsigned char)(i + 1);
+        wait_vsync();
+        ui_draw_hand(g, 0);
+        pause_frames(4);
+    }
+    g->players[0].count = full_count;
+}
+
 /* Returns 1 if the game just ended. */
 static unsigned char handle_post_play_flags(GameState *g) {
     if (g->flag_win) {
@@ -23,19 +80,19 @@ static unsigned char handle_post_play_flags(GameState *g) {
     if (g->flag_skip != NONE) {
         wait_vsync();
         ui_event_skip(g->flag_skip);
-        sfx_turn();
+        sfx_skip();
         pause_frames(70);
     }
     if (g->flag_reverse != NONE) {
         wait_vsync();
         ui_event_reverse(g->flag_reverse);
-        sfx_turn();
+        sfx_reverse();
         pause_frames(60);
     }
     if (g->flag_draw_player != NONE) {
         wait_vsync();
         ui_event_draw(g->flag_draw_player, g->flag_draw_count);
-        sfx_draw();
+        sfx_draw_multi(g->flag_draw_count);
         pause_frames(80);
     }
     if (g->flag_uno_player != NONE) {
@@ -81,7 +138,11 @@ static unsigned char resolve_pending_wd4(GameState *g) {
         resolve_wd4(g, challenged);
         wait_vsync();
         ui_event_challenge_result(g->wd4_victim, g->wd4_player, succeeded);
-        sfx_turn();
+        if (succeeded) {
+            sfx_challenge_success();
+        } else {
+            sfx_challenge_fail();
+        }
         ui_draw_opponents(g);
         ui_draw_hand(g, 0);
         pause_frames(90);
@@ -131,7 +192,7 @@ static unsigned char human_pick_color(GameState *g) {
    (with *game_over set to whatever after_play() returns), 0 if illegal. */
 static unsigned char try_play(GameState *g, unsigned char idx, unsigned char *game_over) {
     Card c;
-    unsigned char chosen;
+    unsigned char chosen, col, row;
 
     c = g->players[0].hand[idx];
     if (!is_legal(g, c)) {
@@ -140,8 +201,10 @@ static unsigned char try_play(GameState *g, unsigned char idx, unsigned char *ga
         return 0;
     }
     chosen = (c.color == COLOR_WILD) ? human_pick_color(g) : 0;
+    ui_hand_card_pos(idx, &col, &row);
     play_card(g, idx, chosen);
     sfx_card_play();
+    animate_toss(col, row, ui_suit_color(c.color == COLOR_WILD ? chosen : c.color));
     wait_vsync();
     ui_draw_opponents(g);
     ui_draw_table(g);
@@ -160,6 +223,9 @@ static unsigned char human_turn(GameState *g) {
     Card drawn;
     unsigned char chosen;
     unsigned char idx;
+    unsigned char blink_counter = 0;
+    unsigned char blink_state = 1;
+    unsigned char col, row;
 
     for (;;) {
         if (redraw) {
@@ -168,9 +234,16 @@ static unsigned char human_turn(GameState *g) {
             ui_draw_table(g);
             ui_draw_hand(g, cursor);
             ui_message("YOUR TURN", ",/.:PICK FIRE:PLAY U:DRAW OR A KEY");
+            blink_state = 1;
+            blink_counter = 0;
             redraw = 0;
         }
         wait_vsync();
+        if (++blink_counter >= 25) {
+            blink_counter = 0;
+            blink_state = !blink_state;
+            ui_blink_cursor(cursor, blink_state);
+        }
         pressed = joy_pressed();
         qs = joy_quick_select();
         if (pressed & IN_RIGHT) {
@@ -192,8 +265,10 @@ static unsigned char human_turn(GameState *g) {
             if (is_legal(g, drawn)) {
                 idx = g->players[0].count - 1;
                 chosen = (drawn.color == COLOR_WILD) ? human_pick_color(g) : 0;
+                ui_draw_pile_pos(&col, &row);
                 play_card(g, idx, chosen);
                 sfx_card_play();
+                animate_toss(col, row, ui_suit_color(drawn.color == COLOR_WILD ? chosen : drawn.color));
                 wait_vsync();
                 ui_draw_opponents(g);
                 ui_draw_table(g);
@@ -219,6 +294,7 @@ static unsigned char cpu_turn(GameState *g, unsigned char idx) {
     unsigned char chosen;
     Card drawn;
     Card c;
+    unsigned char col, row;
 
     wait_vsync();
     ui_draw_opponents(g);
@@ -226,6 +302,8 @@ static unsigned char cpu_turn(GameState *g, unsigned char idx) {
     ui_draw_hand(g, 0);
     ui_event_thinking(idx);
     pause_frames(50);
+
+    ui_opponent_pos(idx, &col, &row);
 
     hand_idx = ai_choose_card(g, idx);
     if (hand_idx == NONE) {
@@ -240,6 +318,7 @@ static unsigned char cpu_turn(GameState *g, unsigned char idx) {
             chosen = (drawn.color == COLOR_WILD) ? ai_choose_color(g, idx) : 0;
             play_card(g, hand_idx, chosen);
             sfx_card_play();
+            animate_toss(col, row, ui_suit_color(drawn.color == COLOR_WILD ? chosen : drawn.color));
         } else {
             end_turn_no_play(g);
             return 0;
@@ -249,6 +328,7 @@ static unsigned char cpu_turn(GameState *g, unsigned char idx) {
         chosen = (c.color == COLOR_WILD) ? ai_choose_color(g, idx) : 0;
         play_card(g, hand_idx, chosen);
         sfx_card_play();
+        animate_toss(col, row, ui_suit_color(c.color == COLOR_WILD ? chosen : c.color));
     }
 
     wait_vsync();
@@ -283,6 +363,9 @@ int main(void) {
         game_new(&g);
         game_over = 0;
         ui_draw_frame();
+        ui_draw_opponents(&g);
+        ui_draw_table(&g);
+        animate_deal(&g);
 
         while (!game_over) {
             if (g.current_player == 0) {
@@ -294,6 +377,14 @@ int main(void) {
 
         human_won = (g.winner == 0) ? 1 : 0;
         ui_game_over_screen(human_won, g.winner);
+        if (human_won) {
+            unsigned char f;
+            for (f = 0; f < 32; f++) {
+                ui_win_flourish_step(f);
+                pause_frames(4);
+            }
+            vic_set_border(COL_BLACK);
+        }
 
         for (;;) {
             wait_vsync();
