@@ -29,6 +29,21 @@
 #define COL_MAGENTA 7
 #define COL_ORANGE 8
 
+/* "Tile" colors: each pairs a contrasting foreground with a SUIT-COLORED
+   background (the b7=1 attribute format used throughout this driver ties
+   every foreground index to its own independent background at index+128
+   -- see make_attr() in vbxevid.c -- so a solid colored card face needs
+   its own dedicated index, distinct from the plain-text COL_* indices
+   above, which all pair with a black background). Used for the redefined-
+   tile card rendering in ui_vbxe.c. */
+#define TILE_RED 9
+#define TILE_YELLOW 10
+#define TILE_GREEN 11
+#define TILE_BLUE 12
+#define TILE_WILD 13
+#define TILE_SELECTED 14
+#define NUM_PALETTE_COLORS 15
+
 void vbxe_init(void);
 unsigned char vram_read_byte(unsigned long vram_addr);
 void wait_vsync(void);

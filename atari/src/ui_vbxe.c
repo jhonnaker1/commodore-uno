@@ -1,58 +1,54 @@
 #include "ui.h"
+#include "ui_vbxe.h"
 #include "vbxevid.h"
 
 /* VBXE's text overlay mode gives real per-character color (128
    foreground colors from a 1024-color palette -- see vbxevid.c), so
    unlike atari/src/ui.c (stock Atari text mode, one fg/bg for the
-   whole screen), cards render in their actual suit color instead of
-   relying on a bracketed color-letter alone. The bracket/letter/value
-   scheme is kept anyway for consistency with the rest of this repo's
-   real-color ports (VIC-20, CoCo3, ZX Spectrum) -- it costs nothing
-   once color is available and stays instantly readable. The cursor
-   position uses a dedicated highlight color instead of the card's
-   own, so it's visible regardless of suit. 64 columns (VBXE text
-   mode's narrowest option -- see vbxevid.h) fits 8 cards/row instead
-   of the 40-column stock port's 6. */
+   whole screen), cards render as solid colored TILES -- a real card
+   shape, not a color-letter bracket -- matching the level of the C64
+   port's redefined-charset card graphics. Since VBXE's per-cell
+   attribute ties a foreground index to its own fixed background
+   (index+128, see make_attr() in vbxevid.c), each suit gets its own
+   dedicated TILE_* palette index carrying a colored background with a
+   contrasting foreground for the value character drawn on top (see
+   vbxevid.c's palette table).
+
+   VBXE has no hardware sprites (unlike the C64/C128 ports this mirrors
+   the feature set of), so the "toss" animation moves a small colored
+   block cell-by-cell across the text grid instead of a real sprite --
+   see animate_toss_to() in main_vbxe.c. The selection cursor is a pair
+   of bracket cells flanking the tile, toggled independently of the
+   tile itself (ui_blink_cursor()), the same trick the C64 port uses
+   for its own bracket toggle. */
 
 #define TITLE_Y 0
 #define OPP_Y 2
 #define TABLE_Y 4
-#define MSG_Y1 7
-#define MSG_Y2 8
-#define HAND_LABEL_Y 10
-#define HAND_Y 11
-#define CARDS_PER_ROW 8
-#define COL_SELECTED COL_WHITE
-#define COL_WILD COL_MAGENTA
+#define TABLE_TILE_X 60
+#define MSG_Y1 8
+#define MSG_Y2 9
+#define HAND_LABEL_Y 11
+#define HAND_Y 12
+#define CARDS_PER_ROW 10
+#define SLOT_W 5 /* 1 bracket + 3 tile + 1 bracket */
+#define SLOT_H 4 /* 3 tile rows + 1 label row */
 
-static unsigned char suit_color(unsigned char color) {
+static unsigned char suit_tile(unsigned char color) {
     switch (color) {
-        case COLOR_RED: return COL_RED;
-        case COLOR_YELLOW: return COL_YELLOW;
-        case COLOR_GREEN: return COL_GREEN;
-        default: return COL_BLUE;
+        case COLOR_RED: return TILE_RED;
+        case COLOR_YELLOW: return TILE_YELLOW;
+        case COLOR_GREEN: return TILE_GREEN;
+        default: return TILE_BLUE;
     }
 }
 
-static unsigned char card_color(unsigned char color, unsigned char color_override) {
+static unsigned char card_tile_color(unsigned char color, unsigned char color_override) {
     if (color == COLOR_WILD) {
-        if (color_override == NONE) return COL_WILD;
-        return suit_color(color_override);
+        if (color_override == NONE) return TILE_WILD;
+        return suit_tile(color_override);
     }
-    return suit_color(color);
-}
-
-static char color_letter(unsigned char color, unsigned char color_override) {
-    if (color == COLOR_WILD) {
-        if (color_override == NONE) return '?';
-        color = color_override;
-    }
-    switch (color) {
-        case COLOR_RED: return 'R';
-        case COLOR_YELLOW: return 'Y';
-        case COLOR_GREEN: return 'G';
-        default: return 'B';
-    }
+    return suit_tile(color);
 }
 
 /* '1'-'9', '0', then 'A'-'J' for slots 0-19 (matches the quick-play keys). */
@@ -71,6 +67,22 @@ static char value_char(Card c) {
     return 'F';
 }
 
+/* Draws a solid 3x3 card tile at (x,y) in the given TILE_* color, with
+   the card's value character centered (using the same color index, so
+   it automatically renders in that tile's paired contrasting text
+   color -- see vbxevid.c's palette table). */
+static void draw_tile(unsigned char x, unsigned char y, unsigned char color, char value_ch) {
+    scr_fill_rect(x, y, 3, 3, ' ', color);
+    scr_put((unsigned char)(x + 1), (unsigned char)(y + 1), (unsigned char)value_ch, color);
+}
+
+/* Top-left corner of hand slot `i`'s 3x3 tile (shared by ui_draw_hand,
+   ui_hand_card_pos, and ui_blink_cursor so all three agree on layout). */
+static void hand_slot_pos(unsigned char i, unsigned char *x, unsigned char *y) {
+    *x = (unsigned char)(1 + (i % CARDS_PER_ROW) * SLOT_W + 1);
+    *y = (unsigned char)(HAND_Y + (i / CARDS_PER_ROW) * SLOT_H);
+}
+
 void ui_title_screen(void) {
     scr_clear();
     scr_puts(29, 2, "U N O", COL_WHITE);
@@ -81,19 +93,13 @@ void ui_title_screen(void) {
     scr_puts(15, 12, "SPACE OR RETURN: PLAY / CONFIRM", COL_WHITE);
     scr_puts(15, 13, "CRSR UP: DRAW A CARD", COL_WHITE);
     scr_puts(11, 14, "OR PRESS 1-9,0,A-J: PLAY THAT CARD", COL_WHITE);
-    scr_puts(11, 17, "CARDS SHOW AS [LABEL:COLOR+VALUE]", COL_WHITE);
-    scr_puts(11, 18, "IN THEIR REAL COLOR:", COL_WHITE);
-    scr_puts(11, 19, "R", COL_RED);
-    scr_puts(12, 19, "=RED  ", COL_WHITE);
-    scr_puts(18, 19, "Y", COL_YELLOW);
-    scr_puts(19, 19, "=YELLOW  ", COL_WHITE);
-    scr_puts(28, 19, "G", COL_GREEN);
-    scr_puts(29, 19, "=GREEN  ", COL_WHITE);
-    scr_puts(37, 19, "B", COL_BLUE);
-    scr_puts(38, 19, "=BLUE", COL_WHITE);
-    scr_puts(11, 20, "S=SKIP V=REVERSE D=DRAW2", COL_WHITE);
-    scr_puts(11, 21, "W", COL_WILD);
-    scr_puts(12, 21, "=WILD F=WILD+4", COL_WHITE);
+    scr_puts(15, 17, "CARDS SHOW AS COLORED TILES:", COL_WHITE);
+    draw_tile(15, 18, TILE_RED, 'R');
+    draw_tile(19, 18, TILE_YELLOW, 'Y');
+    draw_tile(23, 18, TILE_GREEN, 'G');
+    draw_tile(27, 18, TILE_BLUE, 'B');
+    draw_tile(31, 18, TILE_WILD, 'W');
+    scr_puts(11, 22, "S=SKIP V=REVERSE D=DRAW2 F=WILD+4", COL_WHITE);
     scr_puts(22, 23, "PRESS FIRE TO START", COL_WHITE);
 }
 
@@ -118,21 +124,22 @@ void ui_draw_opponents(GameState *g) {
 }
 
 void ui_draw_table(GameState *g) {
+    /* g->top_color is always an already-resolved plain color (0-3), even
+       when the top card itself is a wild -- plain COL_* (black background,
+       matching the rest of this status line), not the TILE_* tile-fill
+       colors, which would put a colored patch behind this text. */
     static const char *names[4] = {"RED", "YEL", "GRN", "BLU"};
-    unsigned char col = card_color(g->top_card.color, g->top_color);
-    scr_fill_rect(0, TABLE_Y, COLS, 2, ' ', COL_BLACK);
+    static const unsigned char plain_colors[4] = {COL_RED, COL_YELLOW, COL_GREEN, COL_BLUE};
+    unsigned char tile_col = card_tile_color(g->top_card.color, g->top_color);
+
+    scr_fill_rect(0, TABLE_Y, COLS, 1, ' ', COL_BLACK);
     scr_puts(1, TABLE_Y, "DRAW PILE:", COL_WHITE);
     scr_put_num(12, TABLE_Y, g->draw_count, COL_WHITE);
+    scr_puts(20, TABLE_Y, "COLOR:", COL_WHITE);
+    scr_puts(27, TABLE_Y, names[g->top_color], plain_colors[g->top_color]);
+    scr_puts(35, TABLE_Y, g->direction > 0 ? "DIR ->" : "DIR <-", COL_WHITE);
 
-    scr_puts(20, TABLE_Y, "TOP:", COL_WHITE);
-    scr_put(25, TABLE_Y, '[', col);
-    scr_put(26, TABLE_Y, color_letter(g->top_card.color, g->top_color), col);
-    scr_put(27, TABLE_Y, value_char(g->top_card), col);
-    scr_put(28, TABLE_Y, ']', col);
-
-    scr_puts(1, TABLE_Y + 1, "COLOR:", COL_WHITE);
-    scr_puts(8, TABLE_Y + 1, names[g->top_color], col);
-    scr_puts(20, TABLE_Y + 1, g->direction > 0 ? "DIR ->" : "DIR <-", COL_WHITE);
+    draw_tile(TABLE_TILE_X, TABLE_Y, tile_col, value_char(g->top_card));
 }
 
 void ui_draw_hand(GameState *g, unsigned char cursor) {
@@ -143,20 +150,19 @@ void ui_draw_hand(GameState *g, unsigned char cursor) {
     scr_puts(1, HAND_LABEL_Y, "YOUR HAND:", COL_WHITE);
     scr_put_num(12, HAND_LABEL_Y, p->count, COL_WHITE);
 
-    scr_fill_rect(0, HAND_Y, COLS, 3, ' ', COL_BLACK);
+    scr_fill_rect(0, HAND_Y, COLS, 2 * SLOT_H, ' ', COL_BLACK);
 
     shown = (p->count > HAND_VISIBLE) ? HAND_VISIBLE : p->count;
 
     for (i = 0; i < shown; i++) {
-        col = (i == cursor) ? COL_SELECTED : card_color(p->hand[i].color, NONE);
-        x = 1 + (i % CARDS_PER_ROW) * 6;
-        y = (unsigned char)(HAND_Y + i / CARDS_PER_ROW);
-        scr_put(x, y, '[', col);
-        scr_put(x + 1, y, (unsigned char)label_char(i), col);
-        scr_put(x + 2, y, ':', col);
-        scr_put(x + 3, y, (unsigned char)color_letter(p->hand[i].color, NONE), col);
-        scr_put(x + 4, y, (unsigned char)value_char(p->hand[i]), col);
-        scr_put(x + 5, y, ']', col);
+        hand_slot_pos(i, &x, &y);
+        col = card_tile_color(p->hand[i].color, NONE);
+        draw_tile(x, y, col, value_char(p->hand[i]));
+        scr_put((unsigned char)(x + 1), (unsigned char)(y + 3), (unsigned char)label_char(i), COL_WHITE);
+        if (i == cursor) {
+            scr_put((unsigned char)(x - 1), (unsigned char)(y + 1), '[', COL_WHITE);
+            scr_put((unsigned char)(x + 3), (unsigned char)(y + 1), ']', COL_WHITE);
+        }
     }
 }
 
@@ -168,7 +174,7 @@ void ui_message(const char *line1, const char *line2) {
 
 void ui_draw_color_picker(unsigned char selected) {
     static const char *names[4] = {"RED", "YELLOW", "GREEN", "BLUE"};
-    static const unsigned char cols[4] = {COL_RED, COL_YELLOW, COL_GREEN, COL_BLUE};
+    static const unsigned char tiles[4] = {TILE_RED, TILE_YELLOW, TILE_GREEN, TILE_BLUE};
     unsigned char i, x;
 
     scr_fill_rect(0, MSG_Y1, COLS, 2, ' ', COL_BLACK);
@@ -177,7 +183,7 @@ void ui_draw_color_picker(unsigned char selected) {
         unsigned char sel = (selected == i);
         x = 2 + i * 9;
         scr_put(x, MSG_Y2, sel ? '[' : ' ', COL_WHITE);
-        scr_puts(x + 1, MSG_Y2, names[i], sel ? COL_SELECTED : cols[i]);
+        scr_puts(x + 1, MSG_Y2, names[i], sel ? TILE_SELECTED : tiles[i]);
         scr_put(x + 1 + 6, MSG_Y2, sel ? ']' : ' ', COL_WHITE);
     }
 }
@@ -252,10 +258,10 @@ void ui_draw_challenge_prompt(unsigned char victim, unsigned char player, unsign
     scr_puts(x, MSG_Y2, "CHALLENGE?", COL_WHITE);
     x += 11;
     scr_put(x, MSG_Y2, selected_yes ? '[' : ' ', COL_WHITE);
-    scr_puts(x + 1, MSG_Y2, "YES", selected_yes ? COL_SELECTED : COL_WHITE);
+    scr_puts(x + 1, MSG_Y2, "YES", selected_yes ? TILE_SELECTED : COL_WHITE);
     scr_put(x + 4, MSG_Y2, selected_yes ? ']' : ' ', COL_WHITE);
     scr_put(x + 6, MSG_Y2, !selected_yes ? '[' : ' ', COL_WHITE);
-    scr_puts(x + 7, MSG_Y2, "NO", !selected_yes ? COL_SELECTED : COL_WHITE);
+    scr_puts(x + 7, MSG_Y2, "NO", !selected_yes ? TILE_SELECTED : COL_WHITE);
     scr_put(x + 9, MSG_Y2, !selected_yes ? ']' : ' ', COL_WHITE);
 }
 
@@ -287,4 +293,55 @@ void ui_game_over_screen(unsigned char human_won, unsigned char winner_idx) {
         scr_puts(34, 10, "WINS", COL_WHITE);
     }
     scr_puts(20, 20, "PRESS FIRE TO PLAY AGAIN", COL_WHITE);
+}
+
+/* ---- Position helpers, blinking cursor, and win flourish (VBXE-only
+   extras; see ui_vbxe.h) ---- */
+
+void ui_hand_card_pos(unsigned char index, unsigned char *col, unsigned char *row) {
+    hand_slot_pos(index, col, row);
+}
+
+void ui_draw_pile_pos(unsigned char *col, unsigned char *row) {
+    *col = 12;
+    *row = TABLE_Y;
+}
+
+void ui_top_card_pos(unsigned char *col, unsigned char *row) {
+    *col = TABLE_TILE_X;
+    *row = TABLE_Y;
+}
+
+void ui_opponent_pos(unsigned char idx, unsigned char *col, unsigned char *row) {
+    *col = (unsigned char)(2 + (idx - 1) * 20 + 5);
+    *row = OPP_Y;
+}
+
+unsigned char ui_suit_color(unsigned char color) {
+    return suit_tile(color);
+}
+
+void ui_blink_cursor(unsigned char cursor, unsigned char on) {
+    unsigned char x, y, row;
+    hand_slot_pos(cursor, &x, &y);
+    row = (unsigned char)(y + 1);
+    if (on) {
+        scr_put((unsigned char)(x - 1), row, '[', COL_WHITE);
+        scr_put((unsigned char)(x + 3), row, ']', COL_WHITE);
+    } else {
+        scr_put((unsigned char)(x - 1), row, ' ', COL_BLACK);
+        scr_put((unsigned char)(x + 3), row, ' ', COL_BLACK);
+    }
+}
+
+void ui_win_flourish_step(unsigned char step) {
+    static const unsigned char colors[6] = {
+        COL_RED, COL_YELLOW, COL_GREEN, COL_CYAN, COL_BLUE, COL_MAGENTA
+    };
+    unsigned char x;
+    for (x = 0; x < COLS; x++) {
+        unsigned char c = colors[(x + step) % 6];
+        scr_put(x, 5, '*', c);
+        scr_put(x, 13, '*', c);
+    }
 }

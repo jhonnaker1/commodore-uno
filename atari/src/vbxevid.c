@@ -105,11 +105,6 @@ static void vram_write(unsigned long vram_addr, const unsigned char *data, unsig
     }
 }
 
-static void vram_write_byte(unsigned long vram_addr, unsigned char value) {
-    select_bank(vram_addr);
-    MEMAC_A[vram_addr % MEMAC_A_SIZE] = value;
-}
-
 unsigned char vram_read_byte(unsigned long vram_addr) {
     select_bank(vram_addr);
     return MEMAC_A[vram_addr % MEMAC_A_SIZE];
@@ -167,25 +162,54 @@ void vbxe_init(void) {
        is exactly the all-white screen this was empirically observed
        to produce). */
     {
-        /* Foreground colours: indices 0..COL_ORANGE, streamed in one run.
-           Index 0 (COL_BLACK) explicitly black; 1..8 the suit/UI colours,
-           in COL_* order. */
-        static const unsigned char fg_rgb[] = {
-            0, 0, 0,        /* 0 COL_BLACK  */
-            255, 255, 255,  /* 1 COL_WHITE  */
-            255, 40, 40,    /* 2 COL_RED    */
-            255, 230, 40,   /* 3 COL_YELLOW */
-            60, 220, 60,    /* 4 COL_GREEN  */
-            80, 120, 255,   /* 5 COL_BLUE   */
-            60, 220, 220,   /* 6 COL_CYAN   */
-            230, 60, 220,   /* 7 COL_MAGENTA*/
-            255, 150, 40    /* 8 COL_ORANGE */
+        /* Foreground colours: indices 0..NUM_PALETTE_COLORS-1, streamed in
+           one run. 0-8 are the plain-text COL_* colours (paired with a
+           black background, see below); 9-14 are the TILE_* colours, each
+           carrying the CONTRASTING text colour that will sit on top of
+           that tile's coloured background (white text on the darker reds/
+           greens/blues, black text on light yellow, white on the wild
+           tile's dark fill, black text on the bright cursor-highlight
+           tile). */
+        static const unsigned char fg_rgb[NUM_PALETTE_COLORS * 3] = {
+            0, 0, 0,        /* 0  COL_BLACK  */
+            255, 255, 255,  /* 1  COL_WHITE  */
+            255, 40, 40,    /* 2  COL_RED    */
+            255, 230, 40,   /* 3  COL_YELLOW */
+            60, 220, 60,    /* 4  COL_GREEN  */
+            80, 120, 255,   /* 5  COL_BLUE   */
+            60, 220, 220,   /* 6  COL_CYAN   */
+            230, 60, 220,   /* 7  COL_MAGENTA*/
+            255, 150, 40,   /* 8  COL_ORANGE */
+            255, 255, 255,  /* 9  TILE_RED:      white text on red    */
+            0, 0, 0,        /* 10 TILE_YELLOW:   black text on yellow */
+            255, 255, 255,  /* 11 TILE_GREEN:    white text on green  */
+            255, 255, 255,  /* 12 TILE_BLUE:     white text on blue   */
+            255, 255, 255,  /* 13 TILE_WILD:     white text on dark   */
+            0, 0, 0         /* 14 TILE_SELECTED: black text on white  */
         };
-        /* Backgrounds: indices 128..128+COL_ORANGE, all black (the b7=1
-           attribute encoding puts a cell's background at fg+128). */
-        static const unsigned char bg_rgb[(COL_ORANGE + 1) * 3] = {0};
-        stream_palette(0, fg_rgb, COL_ORANGE + 1);
-        stream_palette(128, bg_rgb, COL_ORANGE + 1);
+        /* Backgrounds: index+128 for each foreground index above (the
+           b7=1 attribute encoding puts a cell's background at fg+128).
+           0-8's backgrounds are black (plain text on black); 9-14's are
+           the actual tile fill colours. */
+        static const unsigned char bg_rgb[NUM_PALETTE_COLORS * 3] = {
+            0, 0, 0,        /* 128 (for COL_BLACK)  */
+            0, 0, 0,        /* 129 (for COL_WHITE)  */
+            0, 0, 0,        /* 130 (for COL_RED)    */
+            0, 0, 0,        /* 131 (for COL_YELLOW) */
+            0, 0, 0,        /* 132 (for COL_GREEN)  */
+            0, 0, 0,        /* 133 (for COL_BLUE)   */
+            0, 0, 0,        /* 134 (for COL_CYAN)   */
+            0, 0, 0,        /* 135 (for COL_MAGENTA)*/
+            0, 0, 0,        /* 136 (for COL_ORANGE) */
+            210, 30, 30,    /* 137 TILE_RED fill    */
+            230, 200, 30,   /* 138 TILE_YELLOW fill */
+            30, 170, 30,    /* 139 TILE_GREEN fill  */
+            50, 80, 210,    /* 140 TILE_BLUE fill   */
+            50, 50, 50,     /* 141 TILE_WILD fill (dark, like a real wild card) */
+            255, 255, 255   /* 142 TILE_SELECTED fill (bright cursor highlight) */
+        };
+        stream_palette(0, fg_rgb, NUM_PALETTE_COLORS);
+        stream_palette(128, bg_rgb, NUM_PALETTE_COLORS);
     }
 
     scr_clear();

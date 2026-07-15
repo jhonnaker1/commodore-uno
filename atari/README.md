@@ -28,13 +28,33 @@ Atari 800XL fitted with a [VBXE](https://vbxe.atari.org/) (Video Board XE)
 card -- a real add-on FPGA video board with its own 512KB VRAM and a proper
 char+attribute text mode, unlike stock Atari text mode's single shared
 fg/bg. See `src/vbxevid.c`/`.h` for the driver and `src/ui_vbxe.c` for the
-real-per-suit-color UI built on top of it (80-column NORMAL-width text
-mode; cards render in their true suit colors -- red/yellow/green/blue,
-wilds in magenta, with a white cursor highlight).
+UI built on top of it (80-column NORMAL-width text mode).
 
-**Status: fully working.** Verified end-to-end in AltirraSDL (native macOS
-Altirra port) driven through AltirraBridge: title screen, dealt hands in
-real suit colors, playing cards, reverse-direction turn flow, CPU turns.
+**Status: fully working, at C64-port feature parity.** Cards render as
+solid 3x3 colored tiles (red/yellow/green/blue, wild in dark gray) with
+the value centered in a contrasting color, not a bracketed color-letter --
+VBXE's per-cell attribute allows a real colored card face, using dedicated
+`TILE_*` palette indices (see vbxevid.h/.c) since the attribute format
+ties every foreground color to its own fixed background. On top of that,
+matching the C64/C128 ports' feature set:
+
+- **Toss animation**: playing a card animates a small colored block from
+  the hand slot to the discard pile, redrawn cell-by-cell each frame
+  (`animate_toss_to()` in `main_vbxe.c`) -- VBXE has no hardware sprites,
+  so this is the redraw-based equivalent of the C64 port's sprite motion.
+- **Deal-in animation**: at the start of each hand, cards animate one at a
+  time from the draw pile into the hand grid (`animate_deal()`).
+- **Blinking selection cursor**: a bracket pair flanking the selected tile
+  toggles on a timer, independent of the tile's own redraw
+  (`ui_blink_cursor()`).
+- **Win-screen flourish**: a rainbow band of `*` characters cycles above
+  and below the win message (`ui_win_flourish_step()`).
+
+Verified end-to-end in AltirraSDL (native macOS Altirra) driven through
+AltirraBridge: title screen with tile legend, dealt hand in real suit
+tiles, toss animation on play, CPU turns, and the win flourish (confirmed
+both visually and via a direct VRAM read-back of the "YOU WIN!" text and
+flourish colors, to rule out a stale-screenshot artifact).
 
 ### Running it
 
@@ -120,11 +140,11 @@ all 24 text rows, then `END`.
 
 ### Possible polish
 
-- `ui_vbxe.c`'s layout coordinates were written for a 64-column screen;
-  it renders fine at 80 columns but slightly left of center. Reflow for
-  80 if desired.
 - The font copy in `vbxe_init` still uses the slow per-byte path (~1s);
   switch it to the direct-window fast path like the screen functions.
+- Opponent hands are still shown as plain "CPUn: NN" text rather than a
+  tile/pile graphic -- consistent with how every other port here shows
+  opponents, so likely not worth changing, but an option if desired.
 
 `src/test_vbxe.c` is a minimal standalone display test (not part of the
 game):
