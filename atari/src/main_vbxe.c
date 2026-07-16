@@ -69,6 +69,18 @@ static void animate_deal(GameState *g) {
     g->players[0].count = full_count;
 }
 
+/* True if the human has at least one card that can be legally played on the
+   current top card -- used to swap the turn prompt to a "you must draw" hint
+   when the whole hand is dimmed/unplayable. */
+static unsigned char human_has_legal_move(GameState *g) {
+    Player *p = &g->players[0];
+    unsigned char i;
+    for (i = 0; i < p->count; i++) {
+        if (is_legal(g, p->hand[i])) return 1;
+    }
+    return 0;
+}
+
 /* Returns 1 if the game just ended. */
 static unsigned char handle_post_play_flags(GameState *g) {
     if (g->flag_win) {
@@ -231,7 +243,11 @@ static unsigned char human_turn(GameState *g) {
             ui_draw_opponents(g);
             ui_draw_table(g);
             ui_draw_hand(g, cursor);
-            ui_message("YOUR TURN", "L/R,FIRE,UP,OR A KEY TO PLAY");
+            if (human_has_legal_move(g)) {
+                ui_message("YOUR TURN", "L/R,FIRE,UP,OR A KEY TO PLAY");
+            } else {
+                ui_message("YOUR TURN", "NO PLAYABLE CARD - PRESS UP TO DRAW");
+            }
             blink_state = 1;
             blink_counter = 0;
             redraw = 0;

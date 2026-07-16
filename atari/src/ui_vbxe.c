@@ -51,6 +51,19 @@ static unsigned char card_tile_color(unsigned char color, unsigned char color_ov
     return suit_tile(color);
 }
 
+/* Darkened-but-still-colored tile for a card that can't be legally played
+   right now (see the TILE_*_DIM note in vbxevid.h). Wilds are always legal
+   so never reach here, but the default keeps it total. */
+static unsigned char dim_tile(unsigned char color) {
+    switch (color) {
+        case COLOR_RED: return TILE_RED_DIM;
+        case COLOR_YELLOW: return TILE_YELLOW_DIM;
+        case COLOR_GREEN: return TILE_GREEN_DIM;
+        case COLOR_BLUE: return TILE_BLUE_DIM;
+        default: return TILE_WILD_DIM;
+    }
+}
+
 /* '1'-'9', '0', then 'A'-'J' for slots 0-19 (matches the quick-play keys). */
 static char label_char(unsigned char idx) {
     if (idx < 9) return (char)('1' + idx);
@@ -81,6 +94,16 @@ static void draw_tile(unsigned char x, unsigned char y, unsigned char color, cha
 static void hand_slot_pos(unsigned char i, unsigned char *x, unsigned char *y) {
     *x = (unsigned char)(1 + (i % CARDS_PER_ROW) * SLOT_W + 1);
     *y = (unsigned char)(HAND_Y + (i / CARDS_PER_ROW) * SLOT_H);
+}
+
+/* Draws the selection highlight for the tile at (x,y): a solid full-height
+   colored bar down each side of the 3x3 tile (columns x-1 and x+3, rows
+   y..y+2), far more visible than the old single-character brackets. A
+   space cell painted in a TILE_* color shows as a solid block of that
+   tile's background, so this reuses the same trick as draw_tile(). */
+static void draw_sel_bars(unsigned char x, unsigned char y, unsigned char color) {
+    scr_fill_rect((unsigned char)(x - 1), y, 1, 3, ' ', color);
+    scr_fill_rect((unsigned char)(x + 3), y, 1, 3, ' ', color);
 }
 
 void ui_title_screen(void) {
@@ -154,14 +177,20 @@ void ui_draw_hand(GameState *g, unsigned char cursor) {
 
     shown = (p->count > HAND_VISIBLE) ? HAND_VISIBLE : p->count;
 
+    /* Dim any card that can't be legally played on the CURRENT top card,
+       whoever's turn it is. Keying the dimming purely to (card, top card)
+       -- rather than also to whose turn it is -- means a card's shade only
+       changes when the top card actually changes, instead of the whole hand
+       flipping bright/dim every time the turn passes between you and the
+       CPUs (which read as distracting flicker). */
     for (i = 0; i < shown; i++) {
+        unsigned char playable = is_legal(g, p->hand[i]);
         hand_slot_pos(i, &x, &y);
-        col = card_tile_color(p->hand[i].color, NONE);
+        col = playable ? card_tile_color(p->hand[i].color, NONE) : dim_tile(p->hand[i].color);
         draw_tile(x, y, col, value_char(p->hand[i]));
         scr_put((unsigned char)(x + 1), (unsigned char)(y + 3), (unsigned char)label_char(i), COL_WHITE);
         if (i == cursor) {
-            scr_put((unsigned char)(x - 1), (unsigned char)(y + 1), '[', COL_WHITE);
-            scr_put((unsigned char)(x + 3), (unsigned char)(y + 1), ']', COL_WHITE);
+            draw_sel_bars(x, y, TILE_SELECTED);
         }
     }
 }
@@ -321,17 +350,14 @@ unsigned char ui_suit_color(unsigned char color) {
     return suit_tile(color);
 }
 
+/* Pulses the selection bars between bright (TILE_SELECTED) and dim
+   (TILE_DIM) rather than fully on/off, so the selected card is ALWAYS
+   clearly marked -- it just breathes to draw the eye, instead of vanishing
+   for half the blink cycle the way the old single brackets did. */
 void ui_blink_cursor(unsigned char cursor, unsigned char on) {
-    unsigned char x, y, row;
+    unsigned char x, y;
     hand_slot_pos(cursor, &x, &y);
-    row = (unsigned char)(y + 1);
-    if (on) {
-        scr_put((unsigned char)(x - 1), row, '[', COL_WHITE);
-        scr_put((unsigned char)(x + 3), row, ']', COL_WHITE);
-    } else {
-        scr_put((unsigned char)(x - 1), row, ' ', COL_BLACK);
-        scr_put((unsigned char)(x + 3), row, ' ', COL_BLACK);
-    }
+    draw_sel_bars(x, y, on ? TILE_SELECTED : TILE_SEL_DIM);
 }
 
 void ui_win_flourish_step(unsigned char step) {

@@ -44,9 +44,17 @@ matching the C64/C128 ports' feature set:
   so this is the redraw-based equivalent of the C64 port's sprite motion.
 - **Deal-in animation**: at the start of each hand, cards animate one at a
   time from the draw pile into the hand grid (`animate_deal()`).
-- **Blinking selection cursor**: a bracket pair flanking the selected tile
-  toggles on a timer, independent of the tile's own redraw
-  (`ui_blink_cursor()`).
+- **Legal-move highlighting**: on the human's turn, cards that can't be
+  played on the current top card are grayed out (a dedicated `TILE_DIM`
+  palette entry), so the playable cards stand out at a glance -- only the
+  VBXE's per-cell color makes this possible, and it heads off the "why
+  won't it let me play that card?" confusion. Full color returns during
+  CPU turns, when playability isn't a live question.
+- **Selection highlight**: the selected card is flanked by solid
+  full-height colored bars (`draw_sel_bars()`) that pulse between bright
+  and dim rather than blinking fully on/off, so the current selection is
+  always unmistakable -- a much stronger cue than the earlier single
+  bracket characters.
 - **Win-screen flourish**: a rainbow band of `*` characters cycles above
   and below the win message (`ui_win_flourish_step()`).
 

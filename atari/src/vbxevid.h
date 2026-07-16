@@ -42,7 +42,19 @@
 #define TILE_BLUE 12
 #define TILE_WILD 13
 #define TILE_SELECTED 14
-#define NUM_PALETTE_COLORS 15
+/* Dimmed "not legal to play right now" tiles: one per suit, each a DARKENED
+   version of the bright TILE_* fill above (not a uniform gray) so an
+   illegal card is clearly muted but still shows its real color -- important
+   when the whole hand is unplayable, so it doesn't collapse into an
+   unreadable gray blob. Used only on the human's turn. */
+#define TILE_RED_DIM 15
+#define TILE_YELLOW_DIM 16
+#define TILE_GREEN_DIM 17
+#define TILE_BLUE_DIM 18
+#define TILE_WILD_DIM 19
+/* Dim phase of the pulsing selection highlight bars (medium gray). */
+#define TILE_SEL_DIM 20
+#define NUM_PALETTE_COLORS 21
 
 void vbxe_init(void);
 unsigned char vram_read_byte(unsigned long vram_addr);

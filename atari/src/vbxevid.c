@@ -185,7 +185,13 @@ void vbxe_init(void) {
             255, 255, 255,  /* 11 TILE_GREEN:    white text on green  */
             255, 255, 255,  /* 12 TILE_BLUE:     white text on blue   */
             255, 255, 255,  /* 13 TILE_WILD:     white text on dark   */
-            0, 0, 0         /* 14 TILE_SELECTED: black text on white  */
+            0, 0, 0,        /* 14 TILE_SELECTED: black text on white  */
+            190, 190, 190,  /* 15 TILE_RED_DIM:    light-gray value on dark red    */
+            190, 190, 190,  /* 16 TILE_YELLOW_DIM: light-gray value on dark yellow */
+            190, 190, 190,  /* 17 TILE_GREEN_DIM:  light-gray value on dark green  */
+            190, 190, 190,  /* 18 TILE_BLUE_DIM:   light-gray value on dark blue   */
+            190, 190, 190,  /* 19 TILE_WILD_DIM:   light-gray value on dark gray   */
+            110, 110, 110   /* 20 TILE_SEL_DIM:    (bar; space cell, fg unused)    */
         };
         /* Backgrounds: index+128 for each foreground index above (the
            b7=1 attribute encoding puts a cell's background at fg+128).
@@ -206,7 +212,18 @@ void vbxe_init(void) {
             30, 170, 30,    /* 139 TILE_GREEN fill  */
             50, 80, 210,    /* 140 TILE_BLUE fill   */
             50, 50, 50,     /* 141 TILE_WILD fill (dark, like a real wild card) */
-            255, 255, 255   /* 142 TILE_SELECTED fill (bright cursor highlight) */
+            255, 255, 255,  /* 142 TILE_SELECTED fill (bright cursor highlight) */
+            /* Dim fills are kept deliberately DARK (~20-25% of the bright
+               TILE_* fills) so a legal card of the same suit unmistakably
+               pops, rather than looking like just "a slightly brighter
+               shade" of its dimmed siblings -- the value char stays light
+               gray so the card is still readable. */
+            55, 14, 14,     /* 143 TILE_RED_DIM fill    (dark red)    */
+            52, 46, 12,     /* 144 TILE_YELLOW_DIM fill (dark yellow) */
+            12, 42, 12,     /* 145 TILE_GREEN_DIM fill  (dark green)  */
+            18, 26, 62,     /* 146 TILE_BLUE_DIM fill   (dark blue)   */
+            26, 26, 26,     /* 147 TILE_WILD_DIM fill   (dark gray)   */
+            110, 110, 110   /* 148 TILE_SEL_DIM fill    (medium gray bar) */
         };
         stream_palette(0, fg_rgb, NUM_PALETTE_COLORS);
         stream_palette(128, bg_rgb, NUM_PALETTE_COLORS);
