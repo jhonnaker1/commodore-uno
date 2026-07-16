@@ -27,7 +27,7 @@ vary wildly across this lineup.
 | [`plus4/`](plus4) | Commodore Plus/4 | Complete — TED video/sound, stock font |
 | [`pet/`](pet) | Commodore PET 4032 (40-column, or 80-column 8032) | Complete — monochrome text UI, single-voice VIA beeper, keyboard only (no joystick port); `make run-8032` builds an alternate 80-column version for the PET 8032 (same hardware family, just double the columns) |
 | [`vic20/`](vic20) | Commodore VIC-20 (+memory expansion) | Complete — redirects the VIC's video matrix back to $1E00 to dodge a real rendering bug at the KERNAL's relocated $1000, color-coded suits (letter + color, since the VIC-20 has real per-cell color after all) |
-| [`atari/`](atari) | Atari 800XL | Complete — standard ANTIC text mode (no per-cell color, so cards use color letters + reverse-video selection like the VIC-20/PET), 4-channel POKEY sound |
+| [`atari/`](atari) | Atari 800XL (stock, or with a VBXE video board) | Complete — the standard build uses ANTIC text mode (no per-cell color, so cards use color letters + reverse-video selection like the VIC-20/PET), 4-channel POKEY sound; `make all-vbxe` builds an alternate version for an 800XL fitted with a [VBXE](https://vbxe.atari.org/) video board, using its real char+attribute 80-column text mode for solid per-suit colored card tiles plus toss/deal animations, a blinking cursor, and a win flourish — at C64-port feature parity (see [`atari/`](atari)) |
 | [`apple/`](apple) | Apple IIe (enhanced) | Complete — 40x24 text mode (no per-cell color, reverse-video selection like the VIC-20/PET/Atari), 1-bit speaker bit-banged for tones; ships as a ProDOS `.SYSTEM` file, see [`apple/`](apple) for how to get it onto a bootable disk image |
 | [`amiga/`](amiga) | Commodore Amiga (68000, Kickstart 2.0+) | Complete — a custom Intuition screen with a real 8-color palette (not the default Workbench screen's washed-out few shades) drawn through console.device with ANSI escape codes, 4-channel Paula sound with a generated sine-wave tone and volume envelope, keyboard input via IDCMP_VANILLAKEY (comma/period/'U' for movement instead of cursor keys — see Controls) |
 | [`cbm510/`](cbm510) | Commodore CBM-II (510/P500) | Complete — the one CBM-II model with a real VIC-II and SID (same chips as the C64, reached through cc65's `pokebsys()`/`peekbsys()` since they live in a separate bank-switched "system bank" plain pointers can't reach), full-color card borders and SID sound effects, same box-drawing charset as the C64/C128 (stock PETSCII, no custom chargen needed) |
@@ -48,6 +48,7 @@ cd pet && make run     # build/uno.prg in xpet
 cd pet && make run-8032 # build/uno8032.prg in xpet -model 8032
 cd vic20 && make run   # build/uno20.prg in xvic -memory all
 cd atari && make run XLXE_ROM=/path/to/your/atarixl.rom  # build/uno.xex in atari800
+cd atari && make all-vbxe  # build/unovbxe.xex for an 800XL with a VBXE video board (see atari/ for running it)
 cd apple && make      # build/uno.system -- see apple/ for the ProDOS disk-image step
 cd amiga && make      # build/uno -- needs m68k-amigaos-gcc on your PATH, see below
 cd cbm510 && make run # build/uno.prg in xcbm5x0
