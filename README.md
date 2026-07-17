@@ -33,6 +33,7 @@ vary wildly across this lineup.
 | [`cbm510/`](cbm510) | Commodore CBM-II (510/P500) | Complete — the one CBM-II model with a real VIC-II and SID (same chips as the C64, reached through cc65's `pokebsys()`/`peekbsys()` since they live in a separate bank-switched "system bank" plain pointers can't reach), full-color card borders and SID sound effects, same box-drawing charset as the C64/C128 (stock PETSCII, no custom chargen needed) |
 | [`c64os/`](c64os) | Commodore 64, running [C64 OS](https://c64os.com/) | In progress — a real windowed C64 OS application (not a shortcut to the bare-metal `c64/` port), written in 6502 assembly against C64 OS's own TMP-syntax KERNAL, hand-assembled with the cross-platform TMPx assembler since it's a closed-source commercial OS with its own SDK, no C toolchain |
 | [`zxspectrum/`](zxspectrum) | Sinclair ZX Spectrum 48K | Complete — Z80 (not 6502) via z88dk; 32x24 text over a bitmap with per-8x8-cell ink/paper color (the classic "attribute clash"), cards shown as bracketed color-letter labels like the VIC-20/PET/Atari ports, `O`/`P`/`Q` "keys as joystick" scheme since a real Spectrum has no cursor keys, 1-bit beeper sound |
+| [`x16/`](x16) | Commander X16 | Complete — the modern 8-bit machine; talks straight to its VERA video chip (per-cell fg+bg color) for solid colored card tiles with legal-move dimming and a pulsing selection highlight, a real **hardware-sprite** card toss (VERA has 128 sprites), and VERA PSG sound — the same feature set as the C64/VBXE ports |
 
 ## Building
 
@@ -54,6 +55,7 @@ cd amiga && make      # build/uno -- needs m68k-amigaos-gcc on your PATH, see be
 cd cbm510 && make run # build/uno.prg in xcbm5x0
 cd c64os && make run  # dist/uno_1.0.d64 in x64sc, booting C64 OS -- see c64os/ below
 cd zxspectrum && make Z88DK_DIR=/path/to/z88dk run  # build/uno.sna in MAME's spectrum driver
+cd x16 && make run X16EMU=/path/to/x16emu_dir  # build/uno.prg in the Commander X16 emulator
 ```
 
 `make` alone just builds; `make clean` removes build artifacts.

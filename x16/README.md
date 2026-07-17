@@ -1,0 +1,78 @@
+# UNO for the Commander X16
+
+Written in C against [cc65](https://cc65.github.io/) (the `cx16` target),
+with one small assembly file for frame timing.
+
+## Requirements
+
+`cl65` on your `PATH` (from cc65) and the [x16emu
+emulator](https://github.com/X16Community/x16-emulator) (with its `rom.bin`)
+to run it. Real hardware works too.
+
+## Building and running
+
+```sh
+make                                   # build/uno.prg
+make run X16EMU=/path/to/x16emu_dir    # launches build/uno.prg in x16emu
+```
+
+`make run` defaults `X16EMU` to `/Users/jhonnaker/x16emu_macos_m1-r48`;
+point it at wherever your emulator (and its `rom.bin`) live. To run by hand:
+
+```sh
+cd /path/to/x16emu_dir
+./x16emu -prg /path/to/uno/x16/build/uno.prg -run
+```
+
+## What makes this port different
+
+The X16's video chip, **VERA**, has a real char + per-cell color text mode:
+each screen cell carries its own foreground *and* background palette index
+(4 bits each, from a reprogrammable 256-entry, 12-bit palette). So, like the
+Atari VBXE port and unlike the color-letter ports (VIC-20/PET/Atari/Spectrum),
+cards render as solid colored **tiles** with a contrasting value character.
+
+This driver talks to VERA directly (through its auto-incrementing data port)
+rather than going through cc65's `conio`, which buys full per-cell background
+control. On top of the tiles it matches the C64/VBXE feature set:
+
+- **Colored card tiles** — solid suit-colored faces (`x16vera.c`'s
+  `cell_color[]` table maps each logical color to a VERA `bg<<4|fg` byte).
+- **Legal-move highlighting** — on the current top card, cards you can't
+  play are drawn in a *darkened* version of their suit color (a handful of
+  palette slots are reprogrammed to dark-suit shades in `vera_init()`), so
+  the playable cards stand out; the whole hand keeps its colors even when
+  nothing is playable, and the prompt switches to "PRESS UP TO DRAW".
+- **Selection highlight** — the selected card is flanked by solid
+  full-height bars that pulse bright/dim.
+- **Hardware-sprite card toss** — the X16 has 128 hardware sprites, so
+  playing (and dealing) glides a *real* VERA sprite (a suit-colored card)
+  from pile to hand, not a redraw-based block (`spr_show`/`spr_move`/
+  `spr_hide` in `x16vera.c`, driven by `animate_toss_to()` in `main.c`).
+- **VERA PSG sound** — the full set of effects on PSG voice 0
+  (`x16snd.c`).
+
+Input is joystick (cc65's `cx16` joystick driver, SNES pad) or keyboard
+(cursor keys + space/return, or `1`-`9`/`0`/`A`-`J` to jump to a card).
+
+## Notes from bringing it up
+
+- **Direct VERA, not conio.** cc65's `conio` renders text on the X16, but
+  its per-cell color model is thinner than writing VERA yourself; direct
+  writes to the text map at VRAM `$1B000` (128-cell stride, `char,color`
+  pairs) give independent per-cell foreground and background, which is what
+  the solid tiles and the dark-dim highlighting need.
+- **Screen codes.** The X16 boots in the PETSCII upper/lowercase font;
+  `vera_init()` switches to upper/graphics (`CHR$(142)`) so screen codes
+  1-26 render as uppercase A-Z, matching `to_screen_code()`.
+- **Frame timing.** cc65's `cx16` target has no `waitvsync()`, so
+  `vsync.s` polls VERA's VSYNC interrupt-status flag with interrupts
+  masked (SEI), so the KERNAL's own vsync IRQ can't clear the flag out from
+  under the poll.
+- **Palette for dimming.** VERA text cells can only reference palette
+  indices 0-15 for background, so the dark-suit "dimmed" colors are made by
+  reprogramming five otherwise-unused default palette slots (3/4/9/10/13)
+  to dark red/yellow/green/blue/gray.
+
+Verified end-to-end in x16emu (title screen, dealt hand in real color
+tiles with legal-move dimming, the sprite toss on deal/play, CPU turns).
