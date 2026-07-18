@@ -34,6 +34,7 @@ vary wildly across this lineup.
 | [`c64os/`](c64os) | Commodore 64, running [C64 OS](https://c64os.com/) | In progress — a real windowed C64 OS application (not a shortcut to the bare-metal `c64/` port), written in 6502 assembly against C64 OS's own TMP-syntax KERNAL, hand-assembled with the cross-platform TMPx assembler since it's a closed-source commercial OS with its own SDK, no C toolchain |
 | [`zxspectrum/`](zxspectrum) | Sinclair ZX Spectrum 48K | Complete — Z80 (not 6502) via z88dk; 32x24 text over a bitmap with per-8x8-cell ink/paper color (the classic "attribute clash"), cards shown as bracketed color-letter labels like the VIC-20/PET/Atari ports, `O`/`P`/`Q` "keys as joystick" scheme since a real Spectrum has no cursor keys, 1-bit beeper sound |
 | [`x16/`](x16) | Commander X16 | Complete — the modern 8-bit machine; talks straight to its VERA video chip (per-cell fg+bg color) for solid colored card tiles with legal-move dimming and a pulsing selection highlight, a real **hardware-sprite** card toss (VERA has 128 sprites), and VERA PSG sound — the same feature set as the C64/VBXE ports |
+| [`mega65/`](mega65) | MEGA65 | Complete — the modern Commodore-65 recreation; compiles as a `c64`-target program that brings up the VIC-IV video chip via [mega65-libc](https://github.com/mega65/mega65-libc) for a per-cell-color 40-column screen (color-bordered card boxes), with SID sound directly mapped at `$D400`. (Legal-move dimming, 80-column mode, and a hardware-sprite toss are noted follow-ups — see [`mega65/`](mega65).) |
 
 ## Building
 
@@ -56,6 +57,7 @@ cd cbm510 && make run # build/uno.prg in xcbm5x0
 cd c64os && make run  # dist/uno_1.0.d64 in x64sc, booting C64 OS -- see c64os/ below
 cd zxspectrum && make Z88DK_DIR=/path/to/z88dk run  # build/uno.sna in MAME's spectrum driver
 cd x16 && make run X16EMU=/path/to/x16emu_dir  # build/uno.prg in the Commander X16 emulator
+cd mega65 && make run XMEGA65=/path/to/xmega65 M65ROM=/path/to/mega65-rom.bin  # build/uno.prg in Xemu's xmega65
 ```
 
 `make` alone just builds; `make clean` removes build artifacts.
