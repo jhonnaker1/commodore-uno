@@ -76,3 +76,39 @@ Input is joystick (cc65's `cx16` joystick driver, SNES pad) or keyboard
 
 Verified end-to-end in x16emu (title screen, dealt hand in real color
 tiles with legal-move dimming, the sprite toss on deal/play, CPU turns).
+
+## Bitmap-graphics build (`make bmp`)
+
+A second, separate build of the same game that renders in a **320x240,
+256-colour bitmap framebuffer** instead of text/tiles -- cards are drawn as
+pixel art (white body, drop shadow, suit border, corner values, a centre
+suit pip), the hand is a **fanned overlap** (each card shows its corner
+strip; the selected card lifts and highlights; spacing auto-tightens so a
+full 20-card hand fits), and the table/messages are drawn with the KERNAL
+font. Same rules, input and PSG sound as the text build -- only the render
+layer differs.
+
+```sh
+make bmp       # build/unobmp.prg (the full bitmap game)
+make run-bmp   # ... and launch it
+make bmpdemo   # build/unobmpdemo.prg (a static card-art render demo)
+```
+
+Built entirely on the X16 KERNAL's **GRAPH_* framebuffer API** (thin cc65
+thunks in `src/graph.s`; `src/vbmp.c` is the drawing + card-art layer,
+`src/ui_bmp.c` the UI, `src/main_game_bmp.c` the loop):
+
+- **Entering graphics mode.** `GRAPH_init` alone does *not* switch the video
+  mode here -- you must call `screen_mode($80)` (320x240x256) first, then
+  `GRAPH_init`.
+- **KERNAL 16-bit ABI.** GRAPH takes arguments in the virtual registers
+  r0-r4 at zero page `$02-$0A`; cc65's `cx16` ZP starts at `$22`, so C sets
+  those directly and the asm thunk just marshals A/X/carry and JMPs the
+  `$FFxx` vector.
+- **Baseline text.** `GRAPH_put_char` positions a glyph by its *baseline*
+  (glyph pixels sit ABOVE the given y), so every erase rectangle that
+  precedes changing text (messages, counts) extends ~8px above the baseline
+  -- otherwise old glyph tops linger and overlap the new text.
+
+Verified end-to-end in x16emu: title, dealt table + fanned hand, full turns
+against the CPUs.
