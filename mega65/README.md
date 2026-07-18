@@ -35,9 +35,12 @@ screen. Cards render as colour-bordered boxes with the value glyph, the same
 (directly mapped at `$D400` in C64 mode — no bank-switching, unlike the
 CBM-II port).
 
+Playing a card animates a **VIC-II hardware sprite** (`mega65spr.c`) gliding
+the card from its hand slot (or a CPU's seat) to the discard pile.
+
 The shared card logic (`cards.c`/`game.c`/`ai.c`) is reused unchanged;
-`mega65vid.c` (video), `mega65snd.c` (SID), `input.c` (keyboard + joystick)
-and the 40-column `ui.c` sit on top.
+`mega65vid.c` (video), `mega65snd.c` (SID), `mega65spr.c` (sprite toss),
+`input.c` (keyboard + joystick) and the 40-column `ui.c` sit on top.
 
 Input is joystick (port 2) or keyboard — cursor left/right to pick a card,
 space/return to play, cursor-up to draw, or `1`-`9`/`0`/`A`-`J` to jump
@@ -75,5 +78,4 @@ The MEGA65 has more to offer that this first cut doesn't use yet:
   gray out unplayable cards using custom dark-suit palette entries; doing the
   same here needs VIC-IV palette reprogramming brought up (the `$D100/$D200/
   $D300` writes weren't taking during bring-up).
-- **Hardware-sprite card toss** (the MEGA65's enhanced sprites) and
-  **stereo** using the second SID at `$D420`.
+- **Stereo** using the second SID at `$D420`.

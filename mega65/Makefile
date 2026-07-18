@@ -1,5 +1,5 @@
 CC65_TARGET = c64
-SRC = src/main.c src/mega65vid.c src/mega65snd.c src/input.c src/ui.c \
+SRC = src/main.c src/mega65vid.c src/mega65snd.c src/mega65spr.c src/input.c src/ui.c \
       src/cards.c src/game.c src/ai.c
 OUT = build/uno.prg
 

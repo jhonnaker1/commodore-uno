@@ -2,6 +2,7 @@
 #include <ascii_charmap.h>
 #include "mega65vid.h"
 #include "mega65snd.h"
+#include "mega65spr.h"
 #include "input.h"
 #include "cards.h"
 #include "game.h"
@@ -13,6 +14,48 @@ static GameState g;
 static void pause_frames(unsigned int n) {
     while (n--) wait_vsync();
 }
+
+/* Card layout constants shared with ui.c (hand card i box at
+   x=1+(i%10)*4, y=15/20; the discard "TOP CARD" box at x=19,y=5). */
+#define TOP_COL 19
+#define TOP_ROW 5
+#define TOSS_STEPS 16
+
+/* Suit index (COLOR_RED..COLOR_BLUE, or a chosen colour for wilds) ->
+   MEGA65 palette index for the sprite. */
+static unsigned char suit_spr_color(unsigned char suit) {
+    switch (suit) {
+        case COLOR_RED: return COL_RED;
+        case COLOR_YELLOW: return COL_YELLOW;
+        case COLOR_GREEN: return COL_GREEN;
+        case COLOR_BLUE: return COL_BLUE;
+        default: return COL_LTGRAY;
+    }
+}
+
+/* Glides the hardware-sprite card from a hand/opponent cell to the discard
+   pile. The caller redraws the table/hand right after, so the sprite just
+   hides itself at the end. */
+static void animate_toss(unsigned char from_col, unsigned char from_row, unsigned char color) {
+    unsigned char step;
+    int x0 = from_col, y0 = from_row, dx = TOP_COL - x0, dy = TOP_ROW - y0;
+
+    spr_show(color, from_col, from_row);
+    for (step = 1; step <= TOSS_STEPS; step++) {
+        unsigned char cx = (unsigned char)(x0 + (dx * (int)step) / TOSS_STEPS);
+        unsigned char cy = (unsigned char)(y0 + (dy * (int)step) / TOSS_STEPS);
+        spr_move(cx, cy);
+        wait_vsync();
+    }
+    spr_hide();
+}
+
+/* Screen cell of hand card `idx` (matches ui.c's ui_draw_hand layout). */
+static unsigned char hand_col(unsigned char idx) { return (unsigned char)(1 + (idx % 10) * 4); }
+static unsigned char hand_row(unsigned char idx) { return (unsigned char)(idx < 10 ? 15 : 20); }
+/* Screen cell of opponent `idx` (1-3), matching ui.c's ui_draw_opponents. */
+static unsigned char opp_col(unsigned char idx) { return (unsigned char)(2 + (idx - 1) * 13 + 2); }
+#define OPP_ROW 2
 
 /* Returns 1 if the game just ended. */
 static unsigned char handle_post_play_flags(GameState *g) {
@@ -144,8 +187,13 @@ static unsigned char try_play(GameState *g, unsigned char idx, unsigned char *ga
         return 0;
     }
     chosen = (c.color == COLOR_WILD) ? human_pick_color(g) : 0;
-    play_card(g, idx, chosen);
-    sfx_card_play();
+    {
+        unsigned char fc = hand_col(idx), fr = hand_row(idx);
+        unsigned char scol = suit_spr_color(c.color == COLOR_WILD ? chosen : c.color);
+        play_card(g, idx, chosen);
+        sfx_card_play();
+        animate_toss(fc, fr, scol);   /* glide the played card to the pile */
+    }
     wait_vsync();
     ui_draw_opponents(g);
     ui_draw_table(g);
@@ -196,8 +244,13 @@ static unsigned char human_turn(GameState *g) {
             if (is_legal(g, drawn)) {
                 idx = g->players[0].count - 1;
                 chosen = (drawn.color == COLOR_WILD) ? human_pick_color(g) : 0;
-                play_card(g, idx, chosen);
-                sfx_card_play();
+                {
+                    unsigned char fc = hand_col(idx), fr = hand_row(idx);
+                    unsigned char scol = suit_spr_color(drawn.color == COLOR_WILD ? chosen : drawn.color);
+                    play_card(g, idx, chosen);
+                    sfx_card_play();
+                    animate_toss(fc, fr, scol);
+                }
                 wait_vsync();
                 ui_draw_opponents(g);
                 ui_draw_table(g);
@@ -244,6 +297,8 @@ static unsigned char cpu_turn(GameState *g, unsigned char idx) {
             chosen = (drawn.color == COLOR_WILD) ? ai_choose_color(g, idx) : 0;
             play_card(g, hand_idx, chosen);
             sfx_card_play();
+            animate_toss(opp_col(idx), OPP_ROW,
+                         suit_spr_color(drawn.color == COLOR_WILD ? chosen : drawn.color));
         } else {
             end_turn_no_play(g);
             return 0;
@@ -253,6 +308,8 @@ static unsigned char cpu_turn(GameState *g, unsigned char idx) {
         chosen = (c.color == COLOR_WILD) ? ai_choose_color(g, idx) : 0;
         play_card(g, hand_idx, chosen);
         sfx_card_play();
+        animate_toss(opp_col(idx), OPP_ROW,
+                     suit_spr_color(c.color == COLOR_WILD ? chosen : c.color));
     }
 
     wait_vsync();
@@ -280,6 +337,7 @@ int main(void) {
     mega65_init();
     snd_init();
     input_init();
+    spr_init();
 
     for (;;) {
         ui_title_screen();
