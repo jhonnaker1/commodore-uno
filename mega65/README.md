@@ -65,7 +65,12 @@ title screen, and the dealt table + hand rendering in colour card boxes.
 
 The MEGA65 has more to offer that this first cut doesn't use yet:
 
-- **80-column mode** (VIC-IV H640) for a roomier layout.
+- **80-column mode** (VIC-IV H640) — NOT reachable from here: this port is a
+  cc65 `c64`-target binary that runs in the MEGA65's **C64 mode**, and the
+  C64 never supported 80 columns. Real 80-col needs the port re-based to
+  **MEGA65/C65 native mode**, which the cc65 `c64` target can't produce (a
+  different toolchain path — KickC/Calypsi/llvm-mos with C65 support, or
+  hand-rolled native code).
 - **Legal-move dimming / a reprogrammed palette** — the VBXE and X16 ports
   gray out unplayable cards using custom dark-suit palette entries; doing the
   same here needs VIC-IV palette reprogramming brought up (the `$D100/$D200/
