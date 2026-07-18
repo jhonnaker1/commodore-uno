@@ -160,3 +160,60 @@ game):
 ```sh
 cl65 -t atarixl -O --start-addr 0x4000 -o build/test_vbxe.xex src/test_vbxe.c src/vbxevid.c
 ```
+
+## VBXE bitmap-graphics build (`make all-vbxe-bmp`)
+
+A separate build of the **full playable game** that renders on VBXE in a
+**real 320x192, 8bpp chunky bitmap** (`build/unovbxebmp.xex`) instead of the
+text overlay above. The text VBXE build (`unovbxe.xex`) is left untouched.
+Where the text overlay draws cards as attribute-colored *cells*, this drives
+a linear framebuffer with a 256-entry, 24-bit palette, so cards are
+full-color **pixel art** -- white body, drop shadow, a suit-colored border,
+corner values, and a center suit badge -- and the hand is a **fanned
+overlap** (each card shows its corner strip; the selected card lifts and
+gets a yellow highlight; spacing auto-tightens so a full 20-card hand
+fits). All text is the Atari ROM charset blitted glyph-by-glyph into the
+framebuffer. Same rules, joystick/keyboard input, and POKEY sound as the
+text build -- only the render layer differs (no hardware-sprite toss or
+blink cursor; the graphics UI redraws on change).
+
+```sh
+make all-vbxe-bmp        # build/unovbxebmp.xex (the full bitmap game)
+make run-vbxe-bmp        # ... and launch it in Altirra (Wine)
+make all-vbxe-bmp-demo   # build/unovbxebmpdemo.xex (static card-art demo)
+```
+
+The layers: `src/vbxebmp.c`/`.h` is the driver + card art, `src/ui_bmp.c`
+the UI (implements the same `ui.h` the text `ui_vbxe.c` does), and
+`src/main_game_vbxebmp.c` the game loop (the same turn logic as
+`main_vbxe.c`). `src/vbxebmp_smoke.c` is the original static render
+prototype the driver was grown from (the `-demo` target).
+
+Verified end-to-end in AltirraBridge (real `atarixl.rom`, VBXE device):
+title screen, dealt table + fanned hand, cursor movement, wild-card color
+picker, and full turns against the three CPUs.
+
+Notes from bringing up the bitmap mode:
+
+- **Selecting SR (bitmap) overlay mode.** The VBXE overlay's mode is picked
+  by the XDL, per Altirra's `vbxe.cpp` `kOvModeTable`: the graphics entry
+  needs the **GMON** control bit (`xdl1 & 3 == 2`) rather than text's TMON,
+  with `xdl1` bit2 clear (SR, not HR) and END/mode-column 0. `OVSTEP` is the
+  per-scanline byte stride (320); OVADR auto-steps by it each scanline in
+  bitmap mode, so the framebuffer is a plain linear 320x192 buffer in VRAM.
+- **CPU reach into VRAM.** Same MEMAC 8K window at `$2000` as the text
+  driver, banked. The 320x192 framebuffer is 60KB but it sits at VRAM
+  `$1000..$FFFF` -- entirely within the low 64K -- so pixel addressing uses
+  fast **16-bit** `unsigned int` math and only the bank register selects
+  which 8K slice the window shows. `fb_fill16()` does a bank-crossing
+  `memset` for horizontal spans.
+- **Keeping the draw fast enough to be interactive.** Two things matter for
+  a game that redraws on every input: (1) the hot paths avoid 32-bit `long`
+  math (the framebuffer fitting under `$10000` is what makes that possible),
+  and (2) **card borders are fill-based, not per-pixel outlines** -- a card
+  is a suit-colored fill, a white body fill inset by 3px, a fill for the
+  centre badge, plus three small ROM-font glyphs, so almost all of the work
+  is fast `memset` runs and only the glyphs plot pixel-by-pixel. (The first
+  prototype outlined borders with `vbmp_pixel` and a full screen took
+  seconds; the fill-based version redraws the table + hand fast enough to
+  play.)
