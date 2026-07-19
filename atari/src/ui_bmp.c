@@ -3,6 +3,7 @@
    as pixel graphics through the vbxebmp layer (VBXE SR 320x192 8bpp
    framebuffer) instead of text tiles. The game loop (main_game_vbxebmp.c)
    is UI-agnostic and calls these. */
+#include <string.h>
 #include "game.h"
 #include "cards.h"
 #include "ui.h"
@@ -125,22 +126,30 @@ void ui_message(const char *line1, const char *line2) {
     if (line2) text(4, MSG_Y2, line2, VC_WHITE);
 }
 
+/* The selection frame is 12px tall at MSG_Y2-2 (=100), so its bottom edge
+   reaches y=111 -- below the 18px-tall message band. Clear 20px (through
+   y=111, just above the hand at HAND_TOP=112) so a moved/cleared selection
+   leaves no bracket-bottom behind. */
+#define PICKER_CLR_H 20
+
 void ui_draw_color_picker(unsigned char selected) {
     static const char *const names[4] = {"RED", "YELLOW", "GREEN", "BLUE"};
     unsigned char i;
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, PICKER_CLR_H);
     text(4, MSG_Y1, "CHOOSE A COLOR:", VC_WHITE);
     for (i = 0; i < 4; i++) {
         unsigned int x = 4 + (unsigned int)i * 76;
         unsigned char c = suit_vc[i];
-        if (i == selected) vbmp_frame_rect(x - 2, MSG_Y2 - 2, 62, 12, VC_YELLOW);
+        /* Frame must clear the widest label ("YELLOW", 6 chars): swatch(12)
+           + gap(4) + 48 = ends at x+64, so span x-2..x+68 (width 70). */
+        if (i == selected) vbmp_frame_rect(x - 2, MSG_Y2 - 2, 70, 12, VC_YELLOW);
         vbmp_fill_rect(x, MSG_Y2, 12, 8, c);
         text(x + 16, MSG_Y2, names[i], c);
     }
 }
 
 void ui_clear_color_picker(void) {
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, PICKER_CLR_H);
 }
 
 void ui_game_over_screen(unsigned char human_won, unsigned char winner_idx) {
@@ -159,39 +168,46 @@ void ui_game_over_screen(unsigned char human_won, unsigned char winner_idx) {
 
 /* ---- event / prompt lines ---- */
 
-static void player_label(unsigned int x, unsigned char y, unsigned char idx, unsigned char color) {
-    if (idx == 0) { text(x, y, "YOU", color); return; }
+/* Draw the player's label ("YOU" or "CPUn") and return the x for the text
+   that follows it, leaving a one-character gap so e.g. "CPU1" and the message
+   never run together. */
+static unsigned int player_label(unsigned int x, unsigned char y, unsigned char idx, unsigned char color) {
+    if (idx == 0) { text(x, y, "YOU", color); return x + 4 * 8; }  /* "YOU" + space */
     text(x, y, "CPU", color);
     vbmp_char(x + 24, y, (unsigned char)('0' + idx), color);
+    return x + 5 * 8;                                              /* "CPUn" + space */
 }
 
 void ui_draw_challenge_prompt(unsigned char victim, unsigned char player, unsigned char selected_yes) {
+    unsigned int lx;
     clear_area(0, MSG_Y1, 320, 18);
-    player_label(4, MSG_Y1, player, VC_WHITE);
-    text(36, MSG_Y1, "PLAYED WILD DRAW FOUR", VC_WHITE);
-    player_label(4, MSG_Y2, victim, VC_WHITE);
-    text(36, MSG_Y2, "CHALLENGE?", VC_WHITE);
+    lx = player_label(4, MSG_Y1, player, VC_WHITE);
+    text(lx, MSG_Y1, "PLAYED WILD DRAW FOUR", VC_WHITE);
+    lx = player_label(4, MSG_Y2, victim, VC_WHITE);
+    text(lx, MSG_Y2, "CHALLENGE?", VC_WHITE);
     text(124, MSG_Y2, "YES", selected_yes ? VC_YELLOW : VC_GRAY);
     text(164, MSG_Y2, "NO", selected_yes ? VC_GRAY : VC_YELLOW);
 }
 
 void ui_event_challenge_result(unsigned char victim, unsigned char player, unsigned char succeeded) {
+    unsigned int lx;
     clear_area(0, MSG_Y1, 320, 18);
-    player_label(4, MSG_Y1, victim, VC_WHITE);
-    text(36, MSG_Y1, "CHALLENGES!", VC_WHITE);
+    lx = player_label(4, MSG_Y1, victim, VC_WHITE);
+    text(lx, MSG_Y1, "CHALLENGES!", VC_WHITE);
     if (succeeded) {
-        player_label(4, MSG_Y2, player, VC_RED);
-        text(36, MSG_Y2, "HAD A MATCH - DRAWS 4", VC_RED);
+        lx = player_label(4, MSG_Y2, player, VC_RED);
+        text(lx, MSG_Y2, "HAD A MATCH - DRAWS 4", VC_RED);
     } else {
-        player_label(4, MSG_Y2, victim, VC_RED);
-        text(36, MSG_Y2, "WAS WRONG - DRAWS 6", VC_RED);
+        lx = player_label(4, MSG_Y2, victim, VC_RED);
+        text(lx, MSG_Y2, "WAS WRONG - DRAWS 6", VC_RED);
     }
 }
 
 void ui_event_skip(unsigned char idx) {
+    unsigned int lx;
     clear_area(0, MSG_Y1, 320, 18);
-    player_label(4, MSG_Y1, idx, VC_WHITE);
-    text(36, MSG_Y1, idx == 0 ? "LOSE A TURN" : "IS SKIPPED", VC_WHITE);
+    lx = player_label(4, MSG_Y1, idx, VC_WHITE);
+    text(lx, MSG_Y1, idx == 0 ? "LOSE A TURN" : "IS SKIPPED", VC_WHITE);
 }
 
 void ui_event_reverse(unsigned char idx) {
@@ -201,16 +217,19 @@ void ui_event_reverse(unsigned char idx) {
 }
 
 void ui_event_draw(unsigned char idx, unsigned char count) {
+    const char *w = idx == 0 ? "MUST DRAW" : "DRAWS";
+    unsigned int lx;
     clear_area(0, MSG_Y1, 320, 18);
-    player_label(4, MSG_Y1, idx, VC_WHITE);
-    text(36, MSG_Y1, idx == 0 ? "MUST DRAW" : "DRAWS", VC_WHITE);
-    put_num(idx == 0 ? 116 : 84, MSG_Y1, count, VC_WHITE);
+    lx = player_label(4, MSG_Y1, idx, VC_WHITE);
+    text(lx, MSG_Y1, w, VC_WHITE);
+    put_num(lx + (unsigned int)strlen(w) * 8 + 8, MSG_Y1, count, VC_WHITE);
 }
 
 void ui_event_uno(unsigned char idx) {
+    unsigned int lx;
     clear_area(0, MSG_Y2, 320, 8);
-    player_label(4, MSG_Y2, idx, VC_YELLOW);
-    text(36, MSG_Y2, "UNO! ONE CARD LEFT!", VC_YELLOW);
+    lx = player_label(4, MSG_Y2, idx, VC_YELLOW);
+    text(lx, MSG_Y2, "UNO! ONE CARD LEFT!", VC_YELLOW);
 }
 
 void ui_event_invalid(void) {
@@ -219,13 +238,15 @@ void ui_event_invalid(void) {
 }
 
 void ui_event_drew_one(unsigned char idx) {
+    unsigned int lx;
     clear_area(0, MSG_Y1, 320, 18);
-    player_label(4, MSG_Y1, idx, VC_WHITE);
-    text(36, MSG_Y1, "DREW A CARD", VC_WHITE);
+    lx = player_label(4, MSG_Y1, idx, VC_WHITE);
+    text(lx, MSG_Y1, "DREW A CARD", VC_WHITE);
 }
 
 void ui_event_thinking(unsigned char idx) {
+    unsigned int lx;
     clear_area(0, MSG_Y1, 320, 18);
-    player_label(4, MSG_Y1, idx, VC_WHITE);
-    text(36, MSG_Y1, "IS THINKING...", VC_WHITE);
+    lx = player_label(4, MSG_Y1, idx, VC_WHITE);
+    text(lx, MSG_Y1, "IS THINKING...", VC_WHITE);
 }
