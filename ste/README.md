@@ -62,11 +62,21 @@ bit position across those four words. That shapes the whole video layer
   serviced on an interrupt vector, and Hatari can map the cursor keys to a
   joystick anyway.
 
-## The bug worth knowing about
+## The bug worth knowing about: `Card` alignment on a 68000
 
-The port crashed with an **Address Error** the moment a game started, while
-the static card-art test was perfect. The cause was not in any ST code — it
-was the *shared* `GameState` layout:
+This one bit twice, and it never came from ST-specific code — it came from
+the *shared* game logic, where it had been harmless for the entire life of
+the project.
+
+`Card` is two `unsigned char`s. That gives it an alignment requirement of
+**1**, and vbcc's m68k backend indeed sets the minimum struct alignment to 1
+(`malign[]` in `machines/m68k/machine.c`). But the compiler still copies a
+two-byte struct with a single **`move.w`** — and a 68000 traps with an
+Address Error on any word access to an odd address. So a `Card` that happens
+to land on an odd address is a crash waiting to happen.
+
+**First occurrence — inside `GameState`.** The original field order put one
+`draw_count` byte between the two `Card` arrays:
 
 ```c
 Card draw_pile[DECK_SIZE];    /* offset 0   */
@@ -74,12 +84,29 @@ unsigned char draw_count;     /* offset 216 */
 Card discard_pile[DECK_SIZE]; /* offset 217 <-- odd */
 ```
 
-`Card` is two bytes with byte alignment, so the compiler is entitled to put
-`discard_pile` on an odd offset — and it renders a two-byte `Card`
-assignment as a single `move.w`, which traps on a 68000 when the address is
-odd. Completely harmless on the 6502 ports, fatal here. `src/game.h` in this
-port keeps every Card-holding member at the front, ahead of the scalars, so
-they all land on even offsets.
+Every access to the discard pile was a coin flip. Symptom: an instant crash
+the moment a game started, while the static card-art test rendered
+perfectly.
+
+**Second occurrence — a `Card` local on the stack.** Fixing the struct got a
+game running, but it still died after a couple of turns, with
+`move.w (d16,A7),(d16,A7)` — a stack-to-stack copy, i.e. a local `Card`
+being passed *by value* (`is_legal(g, drawn)`). The compiler had put that
+local on an odd frame offset, which it is equally entitled to do.
+
+Chasing individual placements was clearly a losing game, so the real fix is
+to make the type itself 2-aligned: `src/cards.h` gives `Card` a trailing
+`unsigned short _pad` member. A member with alignment 2 forces the whole
+struct to alignment 2, so *every* Card — in an array, in a struct, on the
+stack, passed by value — is even. Nothing ever reads `_pad`; Cards are
+always built field by field, so no initializer had to change.
+
+`src/game.h` also keeps the Card-holding members grouped at the front, which
+is no longer strictly required but keeps the layout tidy.
+
+The wider lesson: none of the 6502 ports could ever have surfaced this,
+because the 6502 has no alignment rules at all. It took a machine that
+actually enforces them.
 
 ## Building the toolchain
 

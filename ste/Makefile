@@ -14,6 +14,10 @@ OUT = build/UNO.TOS
 SRC_SMOKE = src/stevid_smoke.c src/stevid.c
 OUT_SMOKE = build/SMOKE.TOS
 
+# vc compiles every source in one go, so just rebuild whenever any header
+# changes -- notably cards.h, whose Card layout is alignment-critical here.
+HDRS = $(wildcard src/*.h)
+
 # Hatari needs a TOS/EmuTOS ROM image; point TOS_ROM at your own.
 TOS_ROM ?= /Users/jhonnaker/hatari/rom/etos512us.img
 HD = build/hd
@@ -24,10 +28,10 @@ all: $(OUT)
 
 smoke: $(OUT_SMOKE)
 
-$(OUT): $(SRC)
+$(OUT): $(SRC) $(HDRS)
 	$(VC) $(CFLAGS) -o $(OUT) $(SRC)
 
-$(OUT_SMOKE): $(SRC_SMOKE)
+$(OUT_SMOKE): $(SRC_SMOKE) $(HDRS)
 	$(VC) $(CFLAGS) -o $(OUT_SMOKE) $(SRC_SMOKE)
 
 # Hatari autostarts the program off an emulated GEMDOS drive.
