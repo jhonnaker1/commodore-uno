@@ -15,9 +15,16 @@
 
 #define DECK_SIZE 108
 
+/* The trailing pad forces 2-byte alignment on the 68000. gcc happens to
+   word-align this two-char struct already (which is why the text build has
+   always worked), but making the requirement explicit matches the ST port
+   and guarantees a Card is never copied by a `move.w` at an odd address --
+   which would trap with an Address Error. Nothing reads _pad; Cards are
+   always built field by field. */
 typedef struct {
     unsigned char color; /* COLOR_RED..COLOR_WILD */
     unsigned char value; /* 0-9, or VAL_* */
+    unsigned short _pad; /* alignment only */
 } Card;
 
 void deck_build(Card deck[DECK_SIZE]);
