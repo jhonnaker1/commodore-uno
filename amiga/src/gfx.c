@@ -1,6 +1,7 @@
 #include <intuition/intuition.h>
 #include <graphics/gfx.h>
 #include <graphics/rastport.h>
+#include <graphics/text.h>
 #include <proto/exec.h>
 #include <proto/intuition.h>
 #include <proto/graphics.h>
@@ -42,6 +43,16 @@ static struct NewWindow nw = {
 static struct Screen *scr;
 static struct Window *win;
 static struct RastPort *rp;
+static struct TextFont *font;
+
+/* Force the fixed 8x8 topaz ROM font. The whole UI lays text out on 8-pixel
+   cells (put_num, the label+number offsets, card-value positions), which is
+   only correct if every glyph advances exactly 8px. The screen's default
+   font is NOT guaranteed to be 8 wide (on this A1200/KS3.1 setup it advances
+   wider, so numbers placed at a computed +N*8 offset overlapped the label
+   before them) -- topaz 8 is definitionally 8x8, baseline 6, and always in
+   ROM. */
+static struct TextAttr topaz8 = { (STRPTR)"topaz.font", 8, FS_NORMAL, 0 };
 
 /* suit (0-4) -> palette index */
 static const unsigned char suit_col[5] = {GC_RED, GC_YELLOW, GC_GREEN, GC_BLUE, GC_GRAY};
@@ -67,6 +78,8 @@ void gfx_init(void) {
        otherwise it sits over the top of the playfield. */
     ShowTitle(scr, FALSE);
 
+    font = OpenFont(&topaz8);      /* ROM font -> exactly 8px per glyph */
+    if (font) SetFont(rp, font);
     SetDrMd(rp, JAM1);              /* text: draw foreground pen only */
     gfx_clear(GC_FELT);
 }
@@ -74,6 +87,7 @@ void gfx_init(void) {
 void gfx_shutdown(void) {
     if (win) CloseWindow(win);
     if (scr) CloseScreen(scr);
+    if (font) CloseFont(font);
 }
 
 /* No memory-mapped raster register here; pace with the display's own

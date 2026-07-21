@@ -110,12 +110,16 @@ void ui_draw_hand(GameState *g, unsigned char cursor) {
 }
 
 void ui_message(const char *line1, const char *line2) {
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, 20);
     if (line1) text(4, MSG_Y1, line1, GC_WHITE);
     if (line2) text(4, MSG_Y2, line2, GC_WHITE);
 }
 
-#define PICKER_CLR_H 20
+/* The picker's selection frame sits at MSG_Y2-2 (=130) and is 12px tall, so
+   it reaches row 141 -- the message lines here are 12px apart (vs 10 on the
+   ST), so the clear must run 22px from MSG_Y1 (to row 141) or the frame's
+   bottom edge lingers as a thin line. HAND_TOP=150 leaves the room. */
+#define PICKER_CLR_H 22
 
 void ui_draw_color_picker(unsigned char selected) {
     static const char *const names[4] = {"RED", "YELLOW", "GREEN", "BLUE"};
@@ -153,7 +157,7 @@ void ui_game_over_screen(unsigned char human_won, unsigned char winner_idx) {
 
 void ui_draw_challenge_prompt(unsigned char victim, unsigned char player, unsigned char selected_yes) {
     int lx;
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, 20);
     lx = player_label(4, MSG_Y1, player, GC_WHITE);
     text(lx, MSG_Y1, "PLAYED WILD DRAW FOUR", GC_WHITE);
     lx = player_label(4, MSG_Y2, victim, GC_WHITE);
@@ -164,7 +168,7 @@ void ui_draw_challenge_prompt(unsigned char victim, unsigned char player, unsign
 
 void ui_event_challenge_result(unsigned char victim, unsigned char player, unsigned char succeeded) {
     int lx;
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, 20);
     lx = player_label(4, MSG_Y1, victim, GC_WHITE);
     text(lx, MSG_Y1, "CHALLENGES!", GC_WHITE);
     if (succeeded) {
@@ -178,21 +182,21 @@ void ui_event_challenge_result(unsigned char victim, unsigned char player, unsig
 
 void ui_event_skip(unsigned char idx) {
     int lx;
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, 20);
     lx = player_label(4, MSG_Y1, idx, GC_WHITE);
     text(lx, MSG_Y1, idx == 0 ? "LOSE A TURN" : "IS SKIPPED", GC_WHITE);
 }
 
 void ui_event_reverse(unsigned char idx) {
     (void)idx;
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, 20);
     text(4, MSG_Y1, "REVERSE! ORDER FLIPPED", GC_WHITE);
 }
 
 void ui_event_draw(unsigned char idx, unsigned char count) {
     const char *w = idx == 0 ? "MUST DRAW" : "DRAWS";
     int lx;
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, 20);
     lx = player_label(4, MSG_Y1, idx, GC_WHITE);
     text(lx, MSG_Y1, w, GC_WHITE);
     put_num(lx + (int)strlen(w) * 8 + 8, MSG_Y1, count, GC_WHITE);
@@ -212,14 +216,14 @@ void ui_event_invalid(void) {
 
 void ui_event_drew_one(unsigned char idx) {
     int lx;
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, 20);
     lx = player_label(4, MSG_Y1, idx, GC_WHITE);
     text(lx, MSG_Y1, "DREW A CARD", GC_WHITE);
 }
 
 void ui_event_thinking(unsigned char idx) {
     int lx;
-    clear_area(0, MSG_Y1, 320, 18);
+    clear_area(0, MSG_Y1, 320, 20);
     lx = player_label(4, MSG_Y1, idx, GC_WHITE);
     text(lx, MSG_Y1, "IS THINKING...", GC_WHITE);
 }
