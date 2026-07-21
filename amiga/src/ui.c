@@ -1,6 +1,27 @@
 #include "ui.h"
 #include "amigacon.h"
 
+/* console.device's internal model is 80 columns wide, but only ~65 of them
+   are actually visible on this screen (the window is wider than the display
+   can show -- see the long comment in amigacon.c). Text centered on the full
+   80 therefore lands right of the visible centre, which is what made the
+   title look off. Centre banners on the visible width instead. The opponents
+   row already sits near this centre, so everything lines up once the title
+   and table use it too. */
+#define VIS_W 68
+
+static unsigned int ui_strlen(const char *s) {
+    unsigned int n = 0;
+    while (s[n]) n++;
+    return n;
+}
+
+static void scr_puts_center(unsigned char y, const char *s, unsigned char color) {
+    unsigned int len = ui_strlen(s);
+    unsigned char x = len >= VIS_W ? 0 : (unsigned char)((VIS_W - len) / 2);
+    scr_puts(x, y, s, color);
+}
+
 /* Layout matches the C128 VDC port's 80x25 design (wider cards, spread/
    centered across the full width) since the Amiga's CON: window gives a
    comparable real per-cell-color 80-column text grid -- just via ANSI
@@ -24,8 +45,11 @@
 #define CARD_W 5
 #define CARD_H 4
 
-#define DRAW_X 18
-#define TOP_X 50
+/* The DRAW pile and TOP CARD centre on the visible width (VIS_W), matching
+   the title and opponents row above, rather than spreading across the full
+   nominal 80 columns (which pushed them right of centre). */
+#define DRAW_X 12
+#define TOP_X 44
 
 /* The screen's actually-visible width turned out to be narrower than the
    80 columns console.device's internal model claims (confirmed
@@ -35,7 +59,9 @@
    card fully on screen. */
 #define HAND_STRIDE 6
 #define HAND_PER_ROW 9
-#define HAND_SAFE_WIDTH 60
+/* Centre the hand on the same visible width as the title/table so it lines
+   up with them; a full 9-card row is 54 wide, so it still fits comfortably. */
+#define HAND_SAFE_WIDTH VIS_W
 
 static const unsigned char suit_color[4] = {COL_RED, COL_YELLOW, COL_GREEN, COL_BLUE};
 
@@ -114,22 +140,22 @@ static void draw_card_box(unsigned char x, unsigned char y, Card c, unsigned cha
 
 void ui_title_screen(void) {
     scr_clear();
-    scr_puts(34, 3, "U    N    O", COL_YELLOW);
-    scr_puts(28, 5, "FOR THE COMMODORE AMIGA", COL_WHITE);
-    scr_puts(25, 10, "1 PLAYER VS 3 COMPUTER PLAYERS", COL_LTGRAY);
-    scr_puts(30, 12, ", AND .: PICK A CARD", COL_CYAN);
-    scr_puts(24, 13, "SPACE OR RETURN: PLAY / CONFIRM", COL_CYAN);
-    scr_puts(33, 14, "U: DRAW A CARD", COL_CYAN);
-    scr_puts(23, 15, "OR PRESS 1-9,0,A-J: PLAY THAT CARD", COL_CYAN);
-    scr_puts(28, 17, "S=SKIP R=REVERSE D=DRAW2", COL_LTGRAY);
-    scr_puts(28, 18, "W=WILD F=WILD DRAW FOUR", COL_LTGRAY);
+    scr_puts_center(3, "U    N    O", COL_YELLOW);
+    scr_puts_center(5, "FOR THE COMMODORE AMIGA", COL_WHITE);
+    scr_puts_center(10, "1 PLAYER VS 3 COMPUTER PLAYERS", COL_LTGRAY);
+    scr_puts_center(12, ", AND .: PICK A CARD", COL_CYAN);
+    scr_puts_center(13, "SPACE OR RETURN: PLAY / CONFIRM", COL_CYAN);
+    scr_puts_center(14, "U: DRAW A CARD", COL_CYAN);
+    scr_puts_center(15, "OR PRESS 1-9,0,A-J: PLAY THAT CARD", COL_CYAN);
+    scr_puts_center(17, "S=SKIP R=REVERSE D=DRAW2", COL_LTGRAY);
+    scr_puts_center(18, "W=WILD F=WILD DRAW FOUR", COL_LTGRAY);
 
-    scr_puts(28, 20, "PRESS SPACE TO START", COL_GREEN);
+    scr_puts_center(20, "PRESS SPACE TO START", COL_GREEN);
 }
 
 void ui_draw_frame(void) {
     scr_clear();
-    scr_puts(33, TITLE_Y, "*** U N O ***", COL_YELLOW);
+    scr_puts_center(TITLE_Y, "*** U N O ***", COL_YELLOW);
 }
 
 void ui_draw_opponents(GameState *g) {
@@ -337,15 +363,16 @@ void ui_event_challenge_result(unsigned char victim, unsigned char player, unsig
 void ui_game_over_screen(unsigned char human_won, unsigned char winner_idx) {
     scr_clear();
     if (human_won) {
-        scr_puts(36, 8, "YOU WIN!", COL_GREEN);
-        scr_puts(27, 10, "GREAT GAME, UNO CHAMPION.", COL_WHITE);
+        scr_puts_center(8, "YOU WIN!", COL_GREEN);
+        scr_puts_center(10, "GREAT GAME, UNO CHAMPION.", COL_WHITE);
     } else {
-        scr_puts(35, 8, "GAME OVER", COL_RED);
-        scr_put(37, 10, 'C', COL_WHITE);
-        scr_put(38, 10, 'P', COL_WHITE);
-        scr_put(39, 10, 'U', COL_WHITE);
-        scr_put(40, 10, (char)('0' + winner_idx), COL_WHITE);
-        scr_puts(42, 10, "WINS", COL_WHITE);
+        unsigned char wx = (VIS_W - 9) / 2;   /* centre "CPUn WINS" (9 chars) */
+        scr_puts_center(8, "GAME OVER", COL_RED);
+        scr_put(wx, 10, 'C', COL_WHITE);
+        scr_put(wx + 1, 10, 'P', COL_WHITE);
+        scr_put(wx + 2, 10, 'U', COL_WHITE);
+        scr_put(wx + 3, 10, (char)('0' + winner_idx), COL_WHITE);
+        scr_puts(wx + 5, 10, "WINS", COL_WHITE);
     }
-    scr_puts(26, 20, "PRESS SPACE TO PLAY AGAIN", COL_CYAN);
+    scr_puts_center(20, "PRESS SPACE TO PLAY AGAIN", COL_CYAN);
 }
