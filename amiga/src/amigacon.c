@@ -64,11 +64,41 @@ static struct Window *win;
 static struct MsgPort *ioport;
 static struct IOStdReq *io;
 
-static void con_write(char *data, unsigned int len) {
+/* The real console.device write -- one DoIO round-trip to the console task. */
+static void con_write_raw(const char *data, unsigned int len) {
     io->io_Command = CMD_WRITE;
     io->io_Data = (APTR)data;
     io->io_Length = (LONG)len;
     DoIO((struct IORequest *)io);
+}
+
+/* Output batching. Drawing a screen goes through hundreds of tiny writes
+   (each scr_put is a cursor-position escape + a colour escape + the char,
+   and scr_fill_rect writes a char at a time), and doing a separate DoIO for
+   each one is what made redraws crawl -- every DoIO is a synchronous message
+   pass to the console.device task. Instead, accumulate all of it into one
+   buffer and flush it with a single DoIO at each frame boundary
+   (scr_flush(), called from wait_vsync() and con_getkey()). console.device
+   then parses the whole escape stream in one go. */
+#define OUTBUF_SIZE 16384
+static char outbuf[OUTBUF_SIZE];
+static unsigned int outlen = 0;
+
+static void scr_flush(void) {
+    if (outlen) {
+        con_write_raw(outbuf, outlen);
+        outlen = 0;
+    }
+}
+
+static void con_write(const char *data, unsigned int len) {
+    unsigned int i;
+    if (outlen + len > OUTBUF_SIZE) scr_flush();
+    if (len > OUTBUF_SIZE) {            /* larger than the buffer (never happens here) */
+        con_write_raw(data, len);
+        return;
+    }
+    for (i = 0; i < len; i++) outbuf[outlen++] = data[i];
 }
 
 void amiga_init(void) {
@@ -109,6 +139,7 @@ void amiga_shutdown(void) {
    in this project) -- pace with the OS's own tick timer instead. One
    tick is 1/50 second. */
 void wait_vsync(void) {
+    scr_flush();       /* push the just-drawn frame to the screen in one write */
     Delay(1);
 }
 
@@ -219,6 +250,8 @@ void scr_fill_rect(unsigned char x, unsigned char y, unsigned char w, unsigned c
 int con_getkey(void) {
     struct IntuiMessage *msg;
     int result = -1;
+
+    scr_flush();       /* make sure the current frame is visible before we poll */
 
     msg = (struct IntuiMessage *)GetMsg(win->UserPort);
     if (msg) {
