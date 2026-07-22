@@ -23,6 +23,12 @@ game logic (`cards.c/h`, `game.c/h`, `ai.c/h`) with a platform-specific
 video, sound, and input layer underneath, since the hardware capabilities
 vary wildly across this lineup.
 
+**Prebuilt binaries** for every platform are attached to the
+[latest release (v1.0.4)](https://github.com/jhonnaker1/commodore-uno/releases/tag/v1.0.4)
+— grab the one for your machine and run it in the matching emulator (per-file
+instructions are in the release notes). To build from source instead, see
+[Building](#building) below.
+
 | Directory | Machine | Status |
 |---|---|---|
 | [`c64/`](c64) | Commodore 64 | Complete — custom charset, hardware sprites, SID sound (filter/ring-mod), full card animations |
