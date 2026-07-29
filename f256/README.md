@@ -61,6 +61,13 @@ draws cards as suit-coloured fills with white value characters.
 - **PGZ packaging.** The linker (with `f256jr_pgz.cfg` + `pgz.s` from the
   FoenixMCP kernel/DOS repo) emits a PGZ directly: code at `$2000`, a `Z`
   header segment, and a zero-size final segment marking the entry point.
+- **Sound is a real SID.** The F256 has an onboard left/right SID pair, and
+  the left one sits at `$D400`-`$D4FF` — register-for-register identical
+  to a 6581/8580, at the same base address the C64 uses. `$D400` is in the
+  fixed I/O page 0 alongside the Vicky registers, so unlike the char/colour
+  matrix it needs no page-switching to reach. `f256snd.c` is a close port
+  of the C64 port's `sid.c` (same voices, waveforms, filter sweeps), with
+  the C64's VIC-raster frame pacing swapped for `wait_vsync()`.
 
 The toolchain glue in `toolchain/` (the `f256jr_pgz.cfg` linker config,
 `pgz.s`, `kernel.c` POSIX/console layer, `api.h`, and `f256jr.lib`) is
@@ -69,7 +76,6 @@ vendored from [ghackwrench/F256_Jr_Kernel_DOS](https://github.com/ghackwrench/F2
 `make smoke` builds `build/uno-smoke.pgz`, a static render test (title +
 a row of colour-tile cards) used to bring the video layer up.
 
-Sound is currently silent (`f256snd.c` stubs); the F256's dual SID is a
-planned follow-up. Verified end-to-end in the `f256k` MAME: title, dealt
-table with colour-tile cards, hand selection, card play, CPU turns, the
+Verified end-to-end in the `f256k` MAME: title, dealt table with
+colour-tile cards, hand selection, card play, CPU turns, SID sound, the
 wild colour picker, and reverse/skip handling.

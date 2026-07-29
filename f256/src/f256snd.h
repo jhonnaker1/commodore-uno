@@ -1,9 +1,13 @@
 #ifndef F256SND_H
 #define F256SND_H
 
-/* Sound-effect interface, shared shape with the other ports. The F256 has
-   dual SID; these are stubs for now (silent) so the game is playable, with
-   real SID effects a planned follow-up. */
+/* Sound effects for the Foenix F256K, driven by its onboard SID (the left
+   SID sits at $D400-$D4FF, register-for-register identical to a real 6581 --
+   same base address and layout as the C64, so this is a close port of the
+   C64 port's sid.c). $D400 lives in the fixed I/O page 0 (MMU_IO_CTRL=0),
+   the same page the Vicky video registers use, so writing it never needs
+   the page-switch dance the video layer does for the $C000 char/colour
+   matrices. */
 
 void snd_init(void);
 void sfx_card_play(void);
