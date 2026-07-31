@@ -260,3 +260,16 @@ a joystick anyway.
   z88dk's `in_pause()` busy-wait instead, which never touches interrupt
   state. See `zxspectrum/README.md` for the rest (attribute-clash color
   handling, the keys-as-joystick control scheme).
+
+## License
+
+MIT — see [LICENSE](LICENSE). Use it, port it, put it on a real machine.
+
+Two directories vendor third-party code that keeps its own licence, and those
+files are not covered by the above: `c64os/inc/` (the C64 OS SDK headers from
+[OpCoders-Inc/c64os-dev](https://github.com/OpCoders-Inc/c64os-dev), MIT, see
+[`c64os/inc/LICENSE`](c64os/inc/LICENSE)) and `c64os/tools/` (the TMPx
+cross-assembler, see [`c64os/tools/LICENSE`](c64os/tools/LICENSE)).
+
+No machine ROMs are included anywhere in this repo — the ports that need one
+(CoCo 3, Atari XL/XE, Atari ST, Amiga, MEGA65) expect you to supply your own.
