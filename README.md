@@ -1,9 +1,8 @@
-# Commodore UNO
+# UNO for Vintage Computers
 
-UNO for classic 8-bit machines (mostly Commodore, plus two Atari, one
-Apple, one Sinclair, one Texas Instruments, one modern Foenix, and two
-16/32-bit 68000 machines): 1 human player vs.
-3 CPU opponents, full rules (Skip, Reverse, Draw Two, Wild, Wild Draw Four
+UNO across a lineup of vintage machines spanning five CPU families — 6502,
+Z80, 6809, 68000 and TMS9900: 1 human player vs. 3 CPU opponents, full rules
+(Skip, Reverse, Draw Two, Wild, Wild Draw Four
 with challenge). Most of the 6502-based ports are written in C against the
 [cc65](https://cc65.github.io/) toolchain and tested in
 [VICE](https://vice-emu.sourceforge.io/) (Commodore),
