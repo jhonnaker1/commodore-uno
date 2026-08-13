@@ -81,10 +81,11 @@ the stack at `HIMEM` so it lands clear of the BIOS work area and of a disk
 interface's variables if one is fitted, zeroes `.bss` and copies initialised
 globals out of ROM.
 
-The game occupies 11,279 bytes of the 16,384 available, so unlike the
-TI-99/4A port there is no bank switching: it is one flat ROM image.
+The game occupies 11,296 bytes of the 16,384 available (5,088 free), so
+unlike the TI-99/4A port there is no bank switching: it is one flat ROM
+image.
 
-## Three things that bite on this hardware
+## Four things that bite on this hardware
 
 **The command engine and the CPU share the VRAM port.** `gfx_fill_rect()`
 returns as soon as the blitter has been *started*, not when it finishes — a
