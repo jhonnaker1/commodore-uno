@@ -228,17 +228,61 @@ a joystick anyway.
 
 ## Notes
 
-- **Atari ST/STE — a struct-alignment bug the 6502 ports had been hiding.**
-  The ST port crashed with an Address Error the instant a game started,
-  while its static card-art test rendered perfectly. The fault wasn't in
-  any ST code: the *shared* `GameState` put a single `draw_count` byte
-  between the two `Card` arrays, so `discard_pile` began on odd offset 217.
-  `Card` is two bytes with byte alignment, so that's legal — but the
-  compiler renders a two-byte `Card` assignment as one `move.w`, and a
-  68000 traps on a word access to an odd address. Completely harmless on
-  every 6502 port (no alignment rules) and invisible for the whole life of
-  the project. `ste/src/game.h` keeps the Card-holding members together at
-  the front so they all land on even offsets.
+One per port, in the same order as the table above — the thing about
+each machine that cost the most time to work out.
+
+- **C64**: the reference implementation the other Commodore ports were
+  derived from, and the only one with a custom character set.
+  `tools/gen_charset.py` builds a 2048-byte chargen in which codes 0-127
+  are copied verbatim from a real C64 character ROM, so ordinary PETSCII
+  text still renders, and 128-255 are hand-drawn card art -- box corners
+  and edges, big digits, action-card icons, a card-back pattern, the
+  cursor. That needs a dumped chargen ROM, which isn't redistributable, so
+  the generated `charset_data.h`/`charset_codes.h` are checked in and a
+  fresh clone builds without one (`make charset` regenerates them if you
+  point `CHARGEN_PATH` at your own dump). `vic_init()` then moves the whole
+  VIC bank to $8000 through CIA2's port A, putting the screen matrix at
+  $8000 and the charset at $8800 -- with the sprite *pointers* at screen
+  base + $3F8, tucked into the 24 bytes at the end of the 1K screen block
+  that a visible 40x25 matrix leaves unused.
+
+- **C128**: two builds from one codebase. The default reuses the C64's
+  VIC-IIe path nearly unchanged (though keyboard input is scanned straight
+  off CIA1 rather than through the KERNAL buffer); `make run-vdc` targets
+  the 80-column 8563/8568 VDC instead. The VDC bites twice. Its character
+  generator wants glyph slots on 16-byte boundaries even though the font is
+  only 8 scanlines tall, so glyphs are stored double-spaced; and register
+  28's character-base bits get re-asserted by the KERNAL's 80-column cursor
+  interrupt, so the driver rewrites them every frame or the charset
+  silently reverts. The subtler one was colour: `vdc.h`'s constants had been
+  copy-pasted from the VIC-II palette, which the VDC does not share -- it is
+  RGBI (bits 3/2/1/0 = red/green/blue/intensity), so `COL_RED` (2) actually
+  rendered as dark blue and `COL_YELLOW` (7) as light cyan. That is the
+  "only blues and greens, no red or yellow" symptom, and it predated the
+  sprite work it first got blamed on.
+
+- **Plus/4**: TED colour bytes are a hue nibble OR'd with a luminance
+  nibble rather than a flat palette index, so `ted.h` spells out its own
+  `COL_*` values. It can't use cc65's `cbm264.h` macros for them, because
+  those collide *by name but not by value* with `cards.h`'s
+  `COLOR_RED`/`COLOR_YELLOW`/etc. suit constants -- the same collision the
+  CBM-510 port hits with `cbm510.h`, and the same shape of problem as the
+  CoCo 3, TI-99/4A and MSX2 ports' `stdlib.h` shims. The shared game logic
+  is verbatim across every port, so wherever a platform header disagrees
+  with it, the platform side gives way.
+
+- **PET**: the only machine here with no CPU-visible vertical-blank or
+  raster signal at all -- there is no VIC-II `$D012` or TED equivalent to
+  poll -- so `wait_tick()` paces the game off the KERNAL jiffy clock via
+  cc65's `clock()` rather than waiting on the display. It is also the only
+  genuinely monochrome target (no colour RAM whatsoever), so cards are
+  bracketed colour-*letter* labels; that fallback was later reused by the
+  VIC-20, Atari, Spectrum and CoCo ports, which have colour but can't spend
+  it per cell cheaply. `make run-8032` builds a separate 80-column
+  executable for the PET 8032 -- same hardware family, same screen at
+  $8000, just twice the columns -- as a parallel `petvid8032.c`/`ui8032.c`
+  pair rather than a runtime switch.
+
 - **VIC-20**: with a memory expansion installed, the KERNAL relocates the
   screen matrix to $1000 by default -- and the real VIC chip has a
   genuine, reproducible rendering bug there (large parts of a correct,
@@ -250,6 +294,36 @@ a joystick anyway.
   so that's safe to do, but its non-contiguous memory layout also means
   cc65's auto-generated "SYS nnnn" BASIC-stub address comes out wrong
   after linking; `tools/patch_sys_addr.py` fixes it up as a build step.
+
+- **Atari 800XL**: the stock build is ordinary ANTIC text, but the VBXE
+  build produced the most misleading bug in the project. The old VBXE
+  manual documents an `MA_CPU` register at `$D64C` for opening the MEMAC
+  CPU window onto video RAM. On the shipping FX core that register **does
+  not exist**: Altirra's register-write switch has no case for `$4C`, so
+  writes are silently dropped, the window never opens, and every "VRAM
+  write" lands in plain Atari RAM instead. The trap is that reads back
+  through the same window then look *correct*, because they hit that same
+  plain RAM -- so the driver appears to work right up until nothing
+  appears on screen. The real protocol is `MEMAC_CONTROL` (`$D65E`) plus
+  `MEMAC_BANK_SEL` (`$D65F`); this driver runs an 8K window at $2000. It
+  was found by reading Altirra's `vbxe.cpp` rather than the documentation,
+  which is the lesson: for this hardware the emulator source is the
+  specification. Two smaller ones -- the ROM font is indexed in Atari
+  internal screen-code order, so writing ATASCII bytes indexes the wrong
+  glyphs; and computing MEMAC bank/offset with a `long` divide per byte
+  made a screen clear take ~600 frames, which looked exactly like a hang.
+
+- **Apple IIe**: builds with `-D,__EXEHDR__=0` to suppress the
+  AppleSingle-style relocation header that cc65's `apple2enh-system.cfg`
+  prepends by default. That header exists to be parsed by a smart loader
+  (cc65's own `LOADER.SYSTEM`), but a plain `-NAME` ProDOS system launch
+  does no parsing at all -- it loads the raw file to $2000 and jumps there,
+  which with the header present means jumping straight into header bytes
+  instead of code. There is also no `make run` target: cc65 cannot emit a
+  bootable ProDOS floppy and no free tool builds one, so
+  `apple/tools/make_disk.py` injects the binary into a copy of your own
+  ProDOS boot image by overwriting an existing multi-block file's data
+  blocks in place.
 
 - **Amiga**: the hand row wraps after 9 cards per row (18 max), not the
   20 most other ports allow. console.device reports an 80-column screen
@@ -309,6 +383,87 @@ a joystick anyway.
   z88dk's `in_pause()` busy-wait instead, which never touches interrupt
   state. See `zxspectrum/README.md` for the rest (attribute-clash color
   handling, the keys-as-joystick control scheme).
+
+- **CoCo 3**: CMOC does its own preprocessing by shelling out to the host's
+  plain `cc -E`, and ships no `stdlib.h` of its own (`rand()`/`srand()` live
+  in `cmoc.h`). The shared `cards.c` includes `<stdlib.h>` and is verbatim
+  across every port, so on macOS it fell through to the system SDK's header,
+  which drags in libc++'s C++ compatibility headers and fails on things
+  (`__BYTE_ORDER__`, a bare `__has_builtin`) that have nothing to do with
+  this program. `src/compat/stdlib.h` shadows it via an earlier `-I` with
+  just `#include <cmoc.h>` -- the same trick the TI-99/4A and MSX2 ports
+  later needed. On the video side the GIME really does have true
+  per-character colour through `attr()`, unlike the PET/VIC-20/Atari/
+  Spectrum ports, but its arguments are raw GIME text-palette *slots*, not
+  RGB: checked empirically in XRoar, index 1 on the default background came
+  out completely invisible, being the same hue as it, so text uses index 4
+  and the highlight index 7.
+
+- **Commander X16**: goes straight at VERA rather than through cc65's
+  `conio`, whose per-cell colour model is thinner than the hardware's --
+  writing the text map at VRAM `$1B000` directly (128-cell stride,
+  `char,colour` pairs) gives independent foreground and background per cell,
+  which is what the solid tiles and the dimmed illegal-move cards need. Two
+  things needed working around: cc65's `cx16` target has no `waitvsync()`,
+  so `vsync.s` polls VERA's own VSYNC interrupt-status flag with interrupts
+  masked, or the KERNAL's vsync IRQ clears the flag out from under the poll;
+  and a text cell can only name palette indices 0-15 for its background, so
+  the dimmed suit colours are made by reprogramming five otherwise-unused
+  default palette slots (3/4/9/10/13) rather than by picking darker existing
+  ones.
+
+- **Atari ST/STE — a struct-alignment bug the 6502 ports had been hiding.**
+  The ST port crashed with an Address Error the instant a game started,
+  while its static card-art test rendered perfectly. The fault wasn't in
+  any ST code: the *shared* `GameState` put a single `draw_count` byte
+  between the two `Card` arrays, so `discard_pile` began on odd offset 217.
+  `Card` is two bytes with byte alignment, so that's legal — but the
+  compiler renders a two-byte `Card` assignment as one `move.w`, and a
+  68000 traps on a word access to an odd address. Completely harmless on
+  every 6502 port (no alignment rules) and invisible for the whole life of
+  the project. `ste/src/game.h` keeps the Card-holding members together at
+  the front so they all land on even offsets.
+
+- **Foenix F256K**: the Vicky's character matrix and colour matrix are
+  *both* mapped at `$C000`, selected by paging the 8K I/O window with
+  `MMU_IO_CTRL` (`$0001`) -- 2 for characters, 3 for colour, 0 for the Vicky
+  control registers. Every screen write is therefore a page-switch sandwich,
+  and each batch is bracketed with `sei`/`cli`: the FoenixMCP kernel's
+  keyboard interrupt expects I/O page 0, and firing mid-write would have it
+  read matrix RAM where it expected its own registers. Sound, by contrast,
+  came nearly free -- the F256's left SID sits at `$D400`, register-for-
+  register a 6581 at the same address the C64 uses, and in the fixed I/O
+  page 0 where it needs no paging at all, so `f256snd.c` is a close port of
+  the C64's `sid.c`.
+
+- **MEGA65**: compiles as a cc65 `c64`-target program that then unlocks the
+  VIC-IV through [mega65-libc](https://github.com/mega65/mega65-libc) -- a
+  C64 binary that stops being one at `mega65_init()`. The awkwardness is at
+  link time: mega65-libc's `random.o` defines its own `rand`/`srand`, which
+  collide with cc65's stdlib, and the shared game logic calls `rand()`. The
+  Makefile drops `random.o` from the built `libmega65.a` rather than
+  patching either side. Text goes through `cputcxy()`, which takes raw
+  screen codes, so `mega65vid.c` translates PETSCII on the way out while the
+  UI's string literals stay ASCII via `<ascii_charmap.h>`.
+
+- **TI-99/4A**: the only port whose *compiler* had to be debugged before
+  the game could be. Nothing packages a TMS9900 compiler, so this is gcc
+  4.4.0 with mburkley's patches built from source -- and on Apple Silicon it
+  segfaulted on every input, including a one-line `add()`. GCC 4.4 calls
+  every generated RTL pattern function through a pointer typed
+  `rtx (*)(rtx, ...)`, which only works where variadic and fixed arguments
+  share a calling convention. True on x86-64 and on AAPCS64; not true on
+  Apple's arm64 ABI, which passes variadic arguments on the stack while the
+  callee reads registers -- so every pattern was built from garbage
+  operands. One line in `gcc/recog.h` fixes it. The machine then has no
+  per-cell colour at all: a single 32-byte table colours *groups of eight
+  character codes*, so the port spends character codes to buy colours --
+  six 24-code ranges (four suits, wild, and the cursor highlight), budgeted
+  across exactly 32 groups. At ~12K it also outgrows the 8K cartridge
+  window, so it ships as a two-bank cart whose loader stub -- byte-identical
+  in both banks, because switching banks swaps memory out from under the
+  program counter -- copies the game into the 32K expansion and runs it
+  from there.
 
 - **MSX2**: the same CPU as the Spectrum port and the opposite experience
   of it. Where the Spectrum has to fight attribute clash for colour, the
