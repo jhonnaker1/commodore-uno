@@ -33,7 +33,7 @@ video, sound, and input layer underneath, since the hardware capabilities
 vary wildly across this lineup.
 
 **Prebuilt binaries** for every platform are attached to the
-[latest release (v1.0.4)](https://github.com/jhonnaker1/commodore-uno/releases/tag/v1.0.4)
+[latest release (v1.0.5)](https://github.com/jhonnaker1/commodore-uno/releases/tag/v1.0.5)
 — grab the one for your machine and run it in the matching emulator (per-file
 instructions are in the release notes). To build from source instead, see
 [Building](#building) below.
