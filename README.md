@@ -23,7 +23,9 @@ family — TI's own 16-bit TMS9900 —
 built with gcc 4.4 carrying
 [mburkley's TMS9900 patches](https://github.com/mburkley/tms9900-gcc) plus
 [Tursi's libti99](https://github.com/tursilion/libti99), and tested in MAME's
-`ti99_4a` driver.
+`ti99_4a` driver. The MSX2 port is Z80 again but a different toolchain and a
+much more capable video chip, built with [SDCC](https://sdcc.sourceforge.net/)
+and tested in [openMSX](https://openmsx.org/).
 
 Each platform is its own self-contained subdirectory sharing the same card
 game logic (`cards.c/h`, `game.c/h`, `ai.c/h`) with a platform-specific
@@ -55,6 +57,7 @@ instructions are in the release notes). To build from source instead, see
 | [`f256/`](f256) | Foenix F256K | Complete — the first 65C02 Foenix machine here; renders cards as solid colour tiles in the **Vicky** per-cell-colour text mode (like the X16/VBXE tile ports). The Vicky char + colour matrices share the `$C000` I/O window, paged by `MMU_IO_CTRL` (`$0001`); colour bytes are `(fg<<4)\|bg` into 16-entry CLUTs. Built with cc65 as a **PGZ** loaded off the SD card by FoenixMCP (`/- uno` from SuperBASIC), keyboard input via the kernel event queue, real SID sound effects (the F256's left SID sits at `$D400`, register-identical to a 6581, same base address as the C64); developed against a `f256k` MAME driver — see [`f256/`](f256) |
 | [`mega65/`](mega65) | MEGA65 | Complete — the modern Commodore-65 recreation; compiles as a `c64`-target program that brings up the VIC-IV video chip via [mega65-libc](https://github.com/mega65/mega65-libc) for a per-cell-color 40-column screen (color-bordered card boxes), a **VIC-II hardware-sprite** card toss on every play, and SID sound directly mapped at `$D400`. (Legal-move dimming and stereo dual-SID are noted follow-ups; 80-column needs native C65 mode — see [`mega65/`](mega65).) |
 | [`ti99/`](ti99) | Texas Instruments TI-99/4A | Complete — the only **TMS9900** machine here (16-bit, and a third CPU family again), built with gcc 4.4 + [mburkley's TMS9900 patches](https://github.com/mburkley/tms9900-gcc) and [libti99](https://github.com/tursilion/libti99). Its TMS9918A has no per-cell colour at all — one 32-byte colour table colours *groups of eight character codes*, so colour belongs to the glyph, not the screen position. The port buys colour back by spending character codes on it: six 24-glyph ranges (four suits, wild, and a cursor highlight) each hold the same card alphabet in their own colour, giving solid colour card tiles like the X16/VBXE/F256 ports on hardware that nominally can't do them. SN76489 sound (three real voices, so chords rather than beeps). At ~12K it outgrows the 8K cartridge window, so it ships as a **16K two-bank cart whose ROM stub copies the game into the 32K expansion and runs it from RAM** — see [`ti99/`](ti99) |
+| [`msx2/`](msx2) | MSX2 (and MSX2+ / turbo R) | Complete — Z80 like the Spectrum port, but via [SDCC](https://sdcc.sourceforge.net/) rather than z88dk and with far better video to aim at. The MSX1's VDP is the same TMS9918A as the TI-99/4A, with the same colour-per-character-code constraint; the MSX2's **V9938** drops it and adds the two things this game wants — a **programmable palette** (SCREEN 5 is 256×212, 16 colours out of 512, so the suits are the real UNO colours rather than the nearest fixed ones) and a **hardware blitter**, which is what makes full pixel-art cards affordable on a 3.58MHz Z80 where the Amiga/ST ports need a 68000 to get the same look. Glyphs come from the machine's own ROM font via the `CGTBL` pointer, so the cartridge carries no font. AY-3-8910 PSG sound — three real voices, so chords; its tone constant `111861/Hz` is identical to the TI-99/4A's SN76489, both being divided down from the same colourburst crystal. Ships as a flat **16K cartridge ROM** (11,279 bytes used, so no bank switching), and runs unchanged on MSX2+ and turbo R — see [`msx2/`](msx2) |
 
 ## Building
 
@@ -154,6 +157,28 @@ cd ti99 && make        # build/uno.rpk
 `make run` launches it in MAME's `ti99_4a` with the 32K expansion attached
 (the game runs from that RAM). At the TI title screen press any key, then
 `2` to pick UNO.
+
+The MSX2 port is the opposite experience — the least painful toolchain in the
+repo, since SDCC is bottled in Homebrew and an MSX cartridge is a plain 16K
+binary with a 16-byte header:
+
+```sh
+brew install sdcc
+cd msx2 && make        # build/uno.rom
+```
+
+`make run` boots it in [openMSX](https://openmsx.org/); it needs no system
+ROMs of your own, since openMSX ships the free C-BIOS
+(`make run MACHINE=C-BIOS_MSX2`). SDCC has no MSX crt0, so
+[`msx2/src/crt0.s`](msx2/src/crt0.s) is the entire C runtime. Three SDCC
+4.6.0 problems bite this port, all written up in
+[`msx2/README.md`](msx2/README.md): an outright internal compiler error, a
+silent miscompile that clobbers a live register, and — the interesting one —
+`__critical`, whose `ld a,i` interrupt-state save walks straight into a
+documented **Z80 erratum**. If an interrupt lands during that one
+instruction the saved state reads as "disabled", the matching `ei` is
+skipped, and interrupts stay off permanently: the frame counter stops and
+the game freezes mid-turn. Plain `di`/`ei` is the fix.
 
 The C64 and C128 versions use a custom character set (real chargen ROM
 glyphs for codes 0-127, hand-drawn card-art glyphs above that). The
@@ -261,6 +286,16 @@ a joystick anyway.
   state. See `zxspectrum/README.md` for the rest (attribute-clash color
   handling, the keys-as-joystick control scheme).
 
+- **MSX2**: the same CPU as the Spectrum port and the opposite experience
+  of it. Where the Spectrum has to fight attribute clash for colour, the
+  V9938 hands over a programmable palette and a blitter, so the cards are
+  real pixel art rather than coloured letters. Interrupts are left alone
+  and running here -- the BIOS's own handler is what advances the `JIFFY`
+  counter `wait_vsync()` waits on, and it is also why R#15 has to be put
+  straight back after reading the blitter's busy flag: that handler reads
+  status register 0 every frame to acknowledge the VDP interrupt, and
+  leaving it pointed elsewhere wedges the machine. See `msx2/README.md`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE). Use it, port it, put it on a real machine.
@@ -273,3 +308,4 @@ cross-assembler, see [`c64os/tools/LICENSE`](c64os/tools/LICENSE)).
 
 No machine ROMs are included anywhere in this repo — the ports that need one
 (CoCo 3, Atari XL/XE, Atari ST, Amiga, MEGA65) expect you to supply your own.
+The MSX2 port needs none: openMSX ships the free C-BIOS, which runs it.
