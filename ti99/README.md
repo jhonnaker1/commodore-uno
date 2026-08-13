@@ -32,9 +32,12 @@ code are necessarily the same colour, everywhere.
 
 The classic TI answer, used here, is to spend character codes to buy colours —
 keep several copies of the glyphs you want in colour, each copy in its own
-colour group. This port carries six 24-glyph ranges (four suits, wild, and a
+colour group. This port carries six 24-code ranges (four suits, wild, and a
 highlight range for the cursor), each holding the same small card alphabet, and
-picks which copy to draw by colour. The result is genuinely solid colour card
+picks which copy to draw by colour. The alphabet itself is 23 glyphs — a range
+runs to 24 because colour can only be assigned a whole 8-code group at a time,
+so three groups is the smallest that fits, leaving one code spare.
+The result is genuinely solid colour card
 tiles, the same look as the X16/VBXE/F256 tile ports, on hardware with no
 per-cell colour at all. The full budget — exactly 32 groups — is laid out in
 [`src/tivid.h`](src/tivid.h).

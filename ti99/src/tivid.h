@@ -13,9 +13,12 @@
    The classic TI answer, and the one used here, is to spend character codes
    to buy colours: keep several copies of the glyphs you need to draw in
    colour, each copy living in its own colour group. So this port carries six
-   24-glyph ranges (the four suits, wild, and a highlight range for the
-   cursor), each holding the same small alphabet of card glyphs, and picks
-   which copy to draw by colour. That buys genuinely solid colour card tiles
+   24-code ranges (the four suits, wild, and a highlight range for the
+   cursor) -- three colour groups apiece -- each holding the same small
+   alphabet of card glyphs, and picks which copy to draw by colour. The
+   alphabet is 23 glyphs, so a range has one code to spare; 24 is what it
+   takes to land on a group boundary, since a group is 8 codes and colour
+   can only be assigned a whole group at a time. That buys solid colour tiles
    -- the same look as the X16/VBXE/F256 tile ports -- on a machine with no
    per-cell colour at all.
 
