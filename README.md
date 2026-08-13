@@ -28,9 +28,13 @@ much more capable video chip, built with [SDCC](https://sdcc.sourceforge.net/)
 and tested in [openMSX](https://openmsx.org/).
 
 Each platform is its own self-contained subdirectory sharing the same card
-game logic (`cards.c/h`, `game.c/h`, `ai.c/h`) with a platform-specific
-video, sound, and input layer underneath, since the hardware capabilities
-vary wildly across this lineup.
+game logic — `cards.c`, `game.c` and `ai.c` are byte-identical across all
+of them — with a platform-specific video, sound, and input layer underneath,
+since the hardware capabilities vary wildly across this lineup. Their
+headers are shared too, with one deliberate exception: the two 68000 ports
+pad and reorder the `Card` struct to satisfy the 68000's alignment rules,
+which the byte-addressable CPUs neither need nor can afford (the padding
+would double `GameState`). See the Atari ST/STE entry under Notes.
 
 **Prebuilt binaries** for every platform are attached to the
 [latest release (v1.0.5)](https://github.com/jhonnaker1/commodore-uno/releases/tag/v1.0.5)
