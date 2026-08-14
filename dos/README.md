@@ -5,9 +5,17 @@ Wild, Wild Draw Four with challenge) — the same game logic as every other
 port in this repo (`cards.c`, `game.c`, `ai.c` are shared verbatim), with a
 CGA/PC-speaker/BIOS-keyboard layer underneath.
 
-Built for the **8088 in real mode**, so the binary runs on a stock 1981 IBM
+Built for the **8088 in real mode**, so the binaries run on a stock 1981 IBM
 PC or PC/XT — and on every PC since, plus DOSBox and FreeDOS. Nothing here
-needs a 286.
+needs a 286, not even the graphics builds: a video card is not a CPU.
+
+Three builds, one codebase, picked by what card you have:
+
+| Build | Video | Screen |
+|---|---|---|
+| `UNO.EXE` | CGA 80x25 colour text | colour card tiles, per-cell foreground and background |
+| `UNOEGA.EXE` | EGA mode 10h | 640x350, 16 colours — pixel-art cards, the highest resolution in this repo |
+| `UNOVGA.EXE` | VGA mode 13h | 320x200, 256 colours — pixel art again, with the suits programmed to the real UNO colours |
 
 ## Controls
 
@@ -76,18 +84,69 @@ hardware. Developing against VGA — or against a less accurate emulator —
 would never have surfaced it, and the port would have snowed on exactly the
 machine it is named for.
 
-Sound is the PC speaker: one square-wave voice gated by timer channel 2 of
-the 8253. Its input clock is 1.193182MHz, which is 14.31818MHz divided by
-12 — and 14.31818 is four times the 3.579545MHz NTSC colourburst. That makes
-this the third machine in the repo whose tone constant comes off that same
-crystal, after the TI-99/4A's SN76489 and the MSX2's AY-3-8910.
+## EGA and VGA: two backends, one UI
+
+The graphics builds share `ui_bmp.c` and differ only in which backend
+implements `gfx.h`. They are about as far apart as PC graphics hardware
+gets, and comparing them is most of the interest:
+
+**EGA mode 10h is planar, and not in the way the Amiga and Atari ST ports
+are.** Those two are planar as well, but there the planes are ordinary CPU
+memory the program addresses itself. EGA's four planes all sit behind
+`A000:0000` at once, and which of them a write reaches — and what value it
+writes — is decided by registers in the Graphics Controller, not by the
+address. A CPU write does not so much carry data to the card as trigger the
+card's own ALU.
+
+`egavid.c` drives it with Set/Reset: the Set/Reset register holds a colour,
+Enable Set/Reset is on for all four planes, and the byte the CPU writes is
+then ignored as data — each plane takes the corresponding bit of the colour
+instead. The Bit Mask register picks which of the eight pixels in the byte
+change; the rest keep what the latches hold, which is why a byte must be
+*read* first (a read loads all four latches). One byte-write therefore
+paints up to eight pixels a solid colour across all four planes at once,
+which suits card tiles exactly.
+
+**VGA mode 13h is the opposite trade, and is startlingly simple**: a pixel
+is a byte, `screen[y*320+x] = colour`. No planes, no latches, no
+registers, no masks. It is the easiest video hardware in this entire repo —
+easier than the C64's — and it arrived last.
+
+So EGA gets nearly four times the pixels, and VGA gets a real palette: 256
+entries chosen from 262,144, so `vgavid.c` programs the four suits to the
+actual UNO colours rather than picking the nearest of a fixed sixteen. The
+EGA build reprograms exactly one entry, the felt, from the default green
+(0,170,0) to a secondary-intensity green (0,85,0) — a dark table colour
+plain CGA cannot make at all.
+
+One thing did *not* scale between them, and it is worth recording because
+the layout was written to derive everything from `GFX_W`/`GFX_H`: the ROM
+font is 8 pixels wide in both modes. EGA is therefore 80 characters across
+and VGA only 40. Vertical positions derive from the screen height happily,
+but text does not — three opponent labels reading `CPU1 CARDS: 7` need 39
+of VGA's 40 columns, and the help line needs more than it has. `ui_bmp.c`
+picks shorter wording below 60 columns, and sizes the table's columns by
+the wider of the card and its label, since at 640 the card is wider and at
+320 the label is.
+
+## Sound
+
+The PC speaker: one square-wave voice gated by timer channel 2 of the 8253.
+Its input clock is 1.193182MHz, which is 14.31818MHz divided by 12 — and
+14.31818 is four times the 3.579545MHz NTSC colourburst. That makes this the
+third machine in the repo whose tone constant comes off that same crystal,
+after the TI-99/4A's SN76489 and the MSX2's AY-3-8910.
 
 ## Building
 
 ```sh
-make          # build/UNO.EXE
-make img      # build/uno.img, a 1.44M FAT12 floppy containing it
-make run      # runs it in DOSBox-X emulating CGA
+make          # build/UNO.EXE     (CGA text)
+make ega      # build/UNOEGA.EXE  (640x350x16)
+make vga      # build/UNOVGA.EXE  (320x200x256)
+make img      # build/uno.img, a 1.44M FAT12 floppy with all three
+make run      # runs the CGA build in DOSBox-X
+make run-ega  # ... the EGA build
+make run-vga  # ... the VGA build
 ```
 
 `WATCOM` points at the toolchain (default `~/dos-toolchain`), `DOSBOX` at
