@@ -1,7 +1,7 @@
 # UNO for Vintage Computers
 
-UNO across a lineup of vintage machines spanning five CPU families — 6502,
-Z80, 6809, 68000 and TMS9900: 1 human player vs. 3 CPU opponents, full rules
+UNO across a lineup of vintage machines spanning six CPU families — 6502,
+Z80, 6809, 68000, TMS9900 and x86: 1 human player vs. 3 CPU opponents, full rules
 (Skip, Reverse, Draw Two, Wild, Wild Draw Four
 with challenge). Most of the 6502-based ports are written in C against the
 [cc65](https://cc65.github.io/) toolchain and tested in
@@ -25,7 +25,10 @@ built with gcc 4.4 carrying
 [Tursi's libti99](https://github.com/tursilion/libti99), and tested in MAME's
 `ti99_4a` driver. The MSX2 port is Z80 again but a different toolchain and a
 much more capable video chip, built with [SDCC](https://sdcc.sourceforge.net/)
-and tested in [openMSX](https://openmsx.org/).
+and tested in [openMSX](https://openmsx.org/). The MS-DOS port is a sixth
+CPU family — Intel x86, the 8088 in real mode — built with
+[Open Watcom](https://open-watcom.github.io/) and tested in
+[DOSBox-X](https://dosbox-x.com/) and [86Box](https://86box.net/).
 
 Each platform is its own self-contained subdirectory sharing the same card
 game logic — `cards.c`, `game.c` and `ai.c` are byte-identical across all
@@ -62,6 +65,7 @@ instructions are in the release notes). To build from source instead, see
 | [`mega65/`](mega65) | MEGA65 | Complete — the modern Commodore-65 recreation; compiles as a `c64`-target program that brings up the VIC-IV video chip via [mega65-libc](https://github.com/mega65/mega65-libc) for a per-cell-color 40-column screen (color-bordered card boxes), a **VIC-II hardware-sprite** card toss on every play, and SID sound directly mapped at `$D400`. (Legal-move dimming and stereo dual-SID are noted follow-ups; 80-column needs native C65 mode — see [`mega65/`](mega65).) |
 | [`ti99/`](ti99) | Texas Instruments TI-99/4A | Complete — the only **TMS9900** machine here (16-bit, and a fifth CPU family), built with gcc 4.4 + [mburkley's TMS9900 patches](https://github.com/mburkley/tms9900-gcc) and [libti99](https://github.com/tursilion/libti99). Its TMS9918A has no per-cell colour at all — one 32-byte colour table colours *groups of eight character codes*, so colour belongs to the glyph, not the screen position. The port buys colour back by spending character codes on it: six 24-code ranges (four suits, wild, and a cursor highlight) each hold the same 23-glyph card alphabet in their own colour, giving solid colour card tiles like the X16/VBXE/F256 ports on hardware that nominally can't do them. SN76489 sound (three real voices, so chords rather than beeps). At ~12K it outgrows the 8K cartridge window, so it ships as a **16K two-bank cart whose ROM stub copies the game into the 32K expansion and runs it from RAM** — see [`ti99/`](ti99) |
 | [`msx2/`](msx2) | MSX2 (and MSX2+ / turbo R) | Complete — Z80 like the Spectrum port, but via [SDCC](https://sdcc.sourceforge.net/) rather than z88dk and with far better video to aim at. The MSX1's VDP is the same TMS9918A as the TI-99/4A, with the same colour-per-character-code constraint; the MSX2's **V9938** drops it and adds the two things this game wants — a **programmable palette** (SCREEN 5 is 256×212, 16 colours out of 512, so the suits are the real UNO colours rather than the nearest fixed ones) and a **hardware blitter**, which is what makes full pixel-art cards affordable on a 3.58MHz Z80 where the Amiga/ST ports need a 68000 to get the same look. Glyphs come from the machine's own ROM font via the `CGTBL` pointer, so the cartridge carries no font. AY-3-8910 PSG sound — three real voices, so chords; its tone constant `111861/Hz` is identical to the TI-99/4A's SN76489, both being divided down from the same colourburst crystal. Ships as a flat **16K cartridge ROM** (11,296 bytes used, so no bank switching), and runs unchanged on MSX2+ and turbo R — see [`msx2/`](msx2) |
+| [`dos/`](dos) | IBM PC/XT and up, MS-DOS | Complete — a sixth CPU family (Intel **x86**), and the widest reach of anything here: built for the **8088 in real mode**, so one binary runs on a 1981 IBM PC, a Pentium, DOSBox and FreeDOS alike. Nothing in it needs a 286. CGA 80x25 colour text gives per-cell foreground *and* background like the X16/VBXE/F256 tile ports, but at twice the C64's width, so the whole hand fits as two straight rows of ten with no overlapping fan. The suits are the real UNO colours only because **blinking is turned off**: CGA's attribute byte has three bits of background, so backgrounds are normally the eight dark colours (yellow comes out brown) — clearing the blink bit re-purposes it as background intensity and unlocks all sixteen. PC-speaker sound (one square-wave voice, so arpeggios not chords), real arrow keys, and ESC quits to the DOS prompt. Ships as a plain `.EXE` and a 1.44M FAT12 floppy image — see [`dos/`](dos) |
 
 ## Building
 
@@ -91,6 +95,7 @@ cd f256 && make       # build/uno.pgz -- put it on an F256 SD card, see f256/ (m
 cd ste && make run VBCC=/path/to/vbcc TOS_ROM=/path/to/tos.img  # build/UNO.TOS in Hatari as an STE
 cd ti99 && make run  # build/uno.rpk in MAME's ti99_4a (needs the tms9900 toolchain, see ti99/)
 cd msx2 && make run  # build/uno.rom in openMSX (brew install sdcc; no system ROM of your own needed)
+cd dos && make run   # build/UNO.EXE in DOSBox-X emulating CGA (make img for a 1.44M floppy)
 ```
 
 `make` alone just builds; `make clean` removes build artifacts.
@@ -215,6 +220,26 @@ generated headers are checked in under `src/charset_data.h` /
 Regenerating them (`make charset`) requires pointing `CHARGEN_PATH` in
 `tools/gen_charset.py` at your own dumped C64 chargen ROM — the ROM itself
 isn't included here.
+
+
+The MS-DOS port needs Open Watcom, the only actively-maintained compiler
+still targeting 16-bit real-mode DOS. It is not packaged for macOS, but
+unlike the TMS9900 and vbcc toolchains it builds natively on Apple Silicon
+with no patches -- the host binaries come out arm64, no Rosetta.
+[`dos/README.md`](dos/README.md) has the commands, including the step that
+is easy to miss: plain `./build.sh` exits 0 having built the compilers into
+per-component `binbuild/` subdirectories with no release tree anywhere, and
+`./build.sh rel` is what gathers them into one prefix. Then:
+
+```sh
+cd dos && make        # build/UNO.EXE
+cd dos && make img    # build/uno.img, a 1.44M FAT12 floppy
+```
+
+`make run` boots it in DOSBox-X emulating CGA. Unlike every other port here,
+this one can also be checked non-visually: `make run-smoke` renders the
+screen, dumps the text buffer and attribute map to a file, and prints it on
+the host.
 
 ## Controls
 
@@ -478,6 +503,24 @@ each machine that cost the most time to work out.
   straight back after reading the blitter's busy flag: that handler reads
   status register 0 every frame to acknowledge the VDP interrupt, and
   leaving it pointed elsewhere wedges the machine. See `msx2/README.md`.
+
+- **MS-DOS**: the first working build had coloured speckles flickering across
+  the screen during CPU turns. That is not a bug — it is **CGA snow**, a
+  genuine defect in the IBM CGA card. The 6845 CRTC and the CPU share the
+  regen buffer at `B800:0000` with no arbitration, so a CPU write while the
+  card is fetching display data costs the CRTC the cycle it needed and puts
+  garbage on screen for it. It afflicts the 80-column text modes on real IBM
+  CGA; clones fixed it and EGA/VGA never had it. Bit 0 of the status port at
+  `0x3DA` is 1 exactly when an access is safe, so every write waits for that
+  first -- but only on CGA, since the poll loop costs a great deal and
+  `cga_init()` has already worked out whether the machine is EGA or better
+  for the blink setting. Worth recording because it is invisible on modern
+  hardware: developing against VGA, or a less accurate emulator, would have
+  shipped a port that snowed on exactly the machine it is named for. This is
+  also the one port that can be checked without looking at it -- DOS can
+  write a file, so `make run-smoke` dumps the rendered text buffer and its
+  attributes for the host to read, and a layout bug that had slot numbers
+  landing on the "YOUR HAND" label was caught that way rather than by eye.
 
 ## License
 
