@@ -53,6 +53,12 @@
 static const unsigned char suit_col[5] = {
     GC_LRED, GC_YELLOW, GC_LGREEN, GC_LBLUE, GC_DGRAY
 };
+/* What to write *on* each suit colour. White is unreadable on yellow and
+   poor on the bright green, so those two take black -- the CGA build has
+   carried this table from the start and the bitmap UI should have too. */
+static const unsigned char suit_fg[5] = {
+    GC_WHITE, GC_BLACK, GC_BLACK, GC_WHITE, GC_WHITE
+};
 static const char *const color_name[4] = {"RED", "YELLOW", "GREEN", "BLUE"};
 
 static char value_char(unsigned char value)
@@ -99,7 +105,8 @@ static void card_face(int x, int y, unsigned char suit, unsigned char value)
     gfx_char(x + GFX_CARD_W - 4 - FW, y + GFX_CARD_H - 4 - FH, v[0], c, GC_WHITE);
 
     gfx_fill_rect(x + (GFX_CARD_W - bw) / 2, y + (GFX_CARD_H - bh) / 2, bw, bh, c);
-    gfx_char(x + (GFX_CARD_W - FW) / 2, y + (GFX_CARD_H - FH) / 2, v[0], GC_WHITE, c);
+    gfx_char(x + (GFX_CARD_W - FW) / 2, y + (GFX_CARD_H - FH) / 2, v[0],
+             suit_fg[s], c);
 }
 
 static void card_back(int x, int y)
@@ -227,9 +234,18 @@ void ui_draw_color_picker(unsigned char selected)
     for (i = 0; i < 4; i++) {
         int x = 8 + (int)i * (GFX_W / 5);
         gfx_fill_rect(x, MSG_Y2, 6 * FW, FH, suit_col[i]);
-        gfx_text(x + FW, MSG_Y2, color_name[i], GC_WHITE, suit_col[i]);
-        if (i == selected)
-            gfx_frame_rect(x - 2, MSG_Y2 - 2, 6 * FW + 4, FH + 4, GC_YELLOW);
+        gfx_text(x + FW, MSG_Y2, color_name[i], suit_fg[i], suit_col[i]);
+        /* The highlight is white, not yellow: yellow is one of the four
+           choices, and a yellow frame around the yellow swatch is invisible
+           -- which makes the picker look like it is not responding at all.
+           Arrow markers either side as well, so the selection reads even
+           where the frame is subtle. */
+        if (i == selected) {
+            gfx_frame_rect(x - 3, MSG_Y2 - 3, 6 * FW + 6, FH + 6, GC_WHITE);
+            gfx_frame_rect(x - 2, MSG_Y2 - 2, 6 * FW + 4, FH + 4, GC_WHITE);
+            gfx_text_t(x - 2 * FW, MSG_Y2, ">", GC_WHITE);
+            gfx_text_t(x + 6 * FW + FW, MSG_Y2, "<", GC_WHITE);
+        }
     }
 }
 

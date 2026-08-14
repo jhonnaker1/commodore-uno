@@ -31,6 +31,11 @@ int main(void)
     ui_message("YOUR TURN", "PICK A CARD AND PLAY IT");
     gfx_dump("TABLE.RAW");
 
+    /* The wild colour picker, which is the one screen a player only reaches
+       by holding a wild card -- easy to leave untested. */
+    ui_draw_color_picker(1);
+    gfx_dump("PICKER.RAW");
+
     gfx_shutdown();
     return 0;
 }
