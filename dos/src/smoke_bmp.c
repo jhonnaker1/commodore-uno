@@ -36,6 +36,13 @@ int main(void)
     ui_draw_color_picker(1);
     gfx_dump("PICKER.RAW");
 
+    /* And again after clearing it: the frame is taller than an ordinary
+       message, and its bottom rows used to survive as a stray white line
+       because nothing else covered them. */
+    ui_clear_color_picker();
+    ui_message("YOUR TURN", "PICK A CARD AND PLAY IT");
+    gfx_dump("CLEARED.RAW");
+
     gfx_shutdown();
     return 0;
 }

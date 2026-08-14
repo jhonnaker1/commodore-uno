@@ -50,6 +50,15 @@
 #define GFX_COLS (GFX_W / FW)
 #define WIDE_SCREEN (GFX_COLS >= 60)
 
+/* The colour picker needs a taller clear than an ordinary two-line message.
+   Its selection frame starts at MSG_Y2-3 and stands FH+6 tall, so it
+   reaches MSG_Y1 + 2*FH + 5 -- past the 2*FH+2 a message occupies. Nothing
+   else covers those rows either: ui_draw_hand() starts its own clear at
+   HAND_Y-4, which is lower still, so the bottom of the frame was surviving
+   as a stray white line under the message area. */
+#define MSG_CLR_H    (2 * FH + 2)
+#define PICKER_CLR_H (2 * FH + 8)
+
 static const unsigned char suit_col[5] = {
     GC_LRED, GC_YELLOW, GC_LGREEN, GC_LBLUE, GC_DGRAY
 };
@@ -221,7 +230,7 @@ void ui_draw_hand(GameState *g, unsigned char cursor)
 
 void ui_message(const char *line1, const char *line2)
 {
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, MSG_CLR_H);
     if (line1) gfx_text_t(8, MSG_Y1, line1, GC_WHITE);
     if (line2) gfx_text_t(8, MSG_Y2, line2, GC_WHITE);
 }
@@ -229,7 +238,7 @@ void ui_message(const char *line1, const char *line2)
 void ui_draw_color_picker(unsigned char selected)
 {
     unsigned char i;
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, PICKER_CLR_H);
     gfx_text_t(8, MSG_Y1, "CHOOSE A COLOR:", GC_WHITE);
     for (i = 0; i < 4; i++) {
         int x = 8 + (int)i * (GFX_W / 5);
@@ -251,7 +260,7 @@ void ui_draw_color_picker(unsigned char selected)
 
 void ui_clear_color_picker(void)
 {
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, PICKER_CLR_H);
 }
 
 void ui_game_over_screen(unsigned char human_won, unsigned char winner_idx)
@@ -276,7 +285,7 @@ void ui_draw_challenge_prompt(unsigned char victim, unsigned char player,
 {
     int lx;
     (void)victim;
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, MSG_CLR_H);
     lx = player_label(8, MSG_Y1, player, GC_WHITE);
     gfx_text_t(lx, MSG_Y1, "PLAYED WILD DRAW FOUR", GC_WHITE);
     gfx_text_t(8, MSG_Y2, "CHALLENGE?", GC_WHITE);
@@ -289,7 +298,7 @@ void ui_event_challenge_result(unsigned char victim, unsigned char player,
                                unsigned char succeeded)
 {
     int lx;
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, MSG_CLR_H);
     lx = player_label(8, MSG_Y1, victim, GC_WHITE);
     gfx_text_t(lx, MSG_Y1, "CHALLENGES!", GC_WHITE);
     if (succeeded) {
@@ -304,7 +313,7 @@ void ui_event_challenge_result(unsigned char victim, unsigned char player,
 void ui_event_skip(unsigned char idx)
 {
     int lx;
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, MSG_CLR_H);
     lx = player_label(8, MSG_Y1, idx, GC_WHITE);
     gfx_text_t(lx, MSG_Y1, idx == 0 ? "LOSE A TURN" : "IS SKIPPED", GC_WHITE);
 }
@@ -312,7 +321,7 @@ void ui_event_skip(unsigned char idx)
 void ui_event_reverse(unsigned char idx)
 {
     (void)idx;
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, MSG_CLR_H);
     gfx_text_t(8, MSG_Y1, "REVERSE! ORDER FLIPPED", GC_WHITE);
 }
 
@@ -320,7 +329,7 @@ void ui_event_draw(unsigned char idx, unsigned char count)
 {
     const char *w = idx == 0 ? "MUST DRAW" : "DRAWS";
     int lx;
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, MSG_CLR_H);
     lx = player_label(8, MSG_Y1, idx, GC_WHITE);
     gfx_text_t(lx, MSG_Y1, w, GC_WHITE);
     put_num(lx + ((int)strlen(w) + 1) * FW, MSG_Y1, count, GC_WHITE);
@@ -343,7 +352,7 @@ void ui_event_invalid(void)
 void ui_event_drew_one(unsigned char idx)
 {
     int lx;
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, MSG_CLR_H);
     lx = player_label(8, MSG_Y1, idx, GC_WHITE);
     gfx_text_t(lx, MSG_Y1, "DREW A CARD", GC_WHITE);
 }
@@ -351,7 +360,7 @@ void ui_event_drew_one(unsigned char idx)
 void ui_event_thinking(unsigned char idx)
 {
     int lx;
-    clear_band(MSG_Y1, 2 * FH + 2);
+    clear_band(MSG_Y1, MSG_CLR_H);
     lx = player_label(8, MSG_Y1, idx, GC_WHITE);
     gfx_text_t(lx, MSG_Y1, "IS THINKING...", GC_WHITE);
 }
