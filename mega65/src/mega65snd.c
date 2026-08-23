@@ -1,4 +1,11 @@
+/* Shared by both builds; each supplies wait_vsync() from its own video
+   layer. The SID itself needs no conditional -- it is at $D400 in C64 mode
+   and in native mode alike, reached the same way. */
+#ifdef M65_NATIVE
+#include "m65native.h"
+#else
 #include "mega65vid.h"   /* wait_vsync() */
+#endif
 #include "mega65snd.h"
 
 /* SID voice 1 at $D400 (same layout as the C64). Directly mapped in C64

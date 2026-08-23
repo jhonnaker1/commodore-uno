@@ -1,81 +1,142 @@
 # UNO for the MEGA65
 
-Written in C against [cc65](https://cc65.github.io/) (the `c64` target),
-using [mega65-libc](https://github.com/mega65/mega65-libc) for the MEGA65's
-VIC-IV video chip.
+The MEGA65 is a modern recreation of the never-released Commodore 65, and it
+is really two machines: a C64 it can pretend to be, and the C65 it actually
+is. This port is built twice, once for each, because no single binary reaches
+both.
+
+| Build | Toolchain | Load | Mode | Screen |
+|---|---|---|---|---|
+| `build/uno.prg` | cc65 (`c64` target) | `$0801` | C64 mode | 40x25, VIC-IV per-cell colour |
+| `build/uno-native.prg` | llvm-mos (`mega65`) | `$2001` | C65/MEGA65 native | **80x25**, VIC-IV H640 |
+
+The shared card logic (`cards.c`/`game.c`/`ai.c`) is identical in both, and
+so is `mega65snd.c` -- the SID is at `$D400` either way.
 
 ## Requirements
 
-`cl65` on your `PATH` (from cc65), and — for `make run` — the
-[Xemu](https://github.com/lgblgblgb/xemu) MEGA65 emulator (`xmega65`) plus a
-MEGA65 ROM. `make` fetches and builds mega65-libc automatically on the first
-build (it needs `git`); real hardware works too.
+For the C64-mode build: `cl65` on your `PATH` (from cc65). For the native
+build: the [llvm-mos SDK](https://github.com/llvm-mos/llvm-mos-sdk/releases),
+which ships **prebuilt for macOS, Linux and Windows** -- point `LLVM_MOS` at
+it (default `~/llvm-mos`). Both builds fetch and build their own copy of
+[mega65-libc](https://github.com/mega65/mega65-libc) on first use (it needs
+`git`); the two copies are built by different paths and are not
+interchangeable.
+
+For `make run`, the [Xemu](https://github.com/lgblgblgb/xemu) MEGA65
+emulator (`xmega65`) plus a MEGA65 ROM. Real hardware works too.
 
 ## Building and running
 
 ```sh
-make                                   # build/uno.prg (clones+builds mega65-libc first time)
-make run XMEGA65=/path/to/xmega65 M65ROM=/path/to/mega65-rom.bin
+make                # build/uno.prg         C64 mode, 40 columns
+make native         # build/uno-native.prg  native mode, 80 columns
+make run            # the C64-mode build in Xemu
+make run-native     # the native build in Xemu
 ```
 
-Or by hand:
+Pass `XMEGA65=/path/to/xmega65 M65ROM=/path/to/mega65-rom.bin` if they are
+not where the Makefile expects.
+
+## Why 80 columns needs native mode
+
+This is the interesting part of the port, and it is easy to get wrong -- the
+first attempt chased it from the wrong direction.
+
+Setting VIC-IV's H640 bit from the C64-mode build does not give you 80
+columns. The blocker is not the video chip, which is perfectly capable; it is
+that a `$0801` load address puts the machine in **C64 mode**, and the C64
+never had 80 columns. `setscreensize(80, 25)` sets the bit and leaves you
+exactly where you were.
+
+Colour RAM makes it concrete. An 80x25 screen is 2000 cells, each wanting its
+own colour byte, and a C64-mode program can only reach the 1K window at
+`$D800`. There is nowhere to put the other 976 bytes.
+
+Native mode solves both at once. A `$2001` load address with a BASIC 65
+header is what actually selects it, and from there mega65-libc's conio drives
+H640 properly -- including the VIC-III horizontal-positioning fix at `$D04C`
+that the mode needs -- and reaches the real colour RAM at `$FF80000` through
+the 45GS02's 32-bit addressing. Every one of the 2000 cells gets its colour.
+
+Since cc65 has no MEGA65 target, that build uses **llvm-mos**. Unlike the
+TMS9900, vbcc and Open Watcom toolchains elsewhere in this repo, it did not
+have to be built from source -- the SDK ships prebuilt. It also generates
+much tighter code: 11,316 bytes versus cc65's 26,042 for the same game.
+
+## What native mode changes in the code
+
+**Input gets simpler, not harder.** `$D610` is the MEGA65's ASCII key
+register: reading it gives the ASCII code of the key waiting, writing pops
+it. So `input_native.c` is a dozen lines of direct hardware access with no
+translation layer, where the C64-mode `input.c` needs cc65's `<conio.h>`,
+`<cbm.h>` and `<joystick.h>`. There is no `<ascii_charmap.h>` anywhere in the
+native sources either -- that include exists in the cc65 build purely to stop
+cc65 applying a PETSCII charmap to string literals, and llvm-mos has no such
+concept. Joystick is still plain CIA1 at `$DC00`; the MEGA65 keeps both CIAs.
+
+**Cards get wider, and better.** At 80 columns a card is 5x4 instead of 3x4,
+which is enough to draw it as a solid block of the suit colour with the value
+**knocked out** of it using the VIC-IV's reverse attribute -- the same look
+the X16, VBXE, F256 and DOS ports build from per-cell foreground+background,
+here done with one attribute bit. A full 20-card hand splits 11/9 across the
+width rather than the 40-column build's 10/10.
+
+**The sprite card toss did not come across.** The C64-mode build glides a
+VIC-II hardware sprite from the played card to the discard pile, which works
+because a probe confirmed mega65-libc leaves the C64 arrangement intact:
+screen at `$0400`, VIC bank 0, sprite pointers at `$07F8`. Native mode
+relocates screen RAM (the base comes from `$D060`-`$D063`) and H640 changes
+sprite pointer handling -- which is why the MEGA65 has extended pointer
+registers at `$D06C`-`$D06E` in the first place. Rather than guess, the
+animation is left out of the native build; putting it back wants the same
+probe-first approach that got it working in C64 mode.
+
+**Uppercase only.** `setuppercase()` selects the upper/graphics charset,
+where screen codes `$41`-`$5A` are graphics symbols rather than lowercase
+letters. A lowercase letter in a UI string comes out as a piece of
+box-drawing -- which is exactly what happened to a stray `"x"` in the draw
+pile count before it was caught.
+
+## Verifying it
+
+The C64-mode build is checked with Xemu's `-prgexit -screenshot`, which saves
+the framebuffer when the program returns to the `READY.` prompt. **That does
+not work for the native build**: llvm-mos binaries do not reliably return to
+BASIC on the MEGA65, so the exit event never fires and the emulator runs
+forever.
+
+Sending **SIGTERM** flushes `-screenshot` and `-dumpscreen` just the same --
+and it works on a program spinning in its main loop, which `-prgexit` never
+could. That removes the awkward part of the old recipe, where a verify build
+had to be patched to draw a state and then `return`.
+
+`smoke_native.c` uses it. Five screens, one per build:
 
 ```sh
-xmega65 -rom /path/to/mega65-rom.bin -prg build/uno.prg
+mos-mega65-clang ... -DSMOKE_SCREEN=N ...
 ```
 
-## What makes this port different
+- `0` the dealt table
+- `1` the wild colour picker
+- `2` the picker cleared, since its frame is taller than an ordinary message
+- `3` a forced 20-card hand, for the 11/9 split
+- `4` an **autoplay soak**: the real engine with the AI in every seat,
+  redrawing every screen each turn until someone wins. The four static
+  screens only prove a layout; this is the one that would surface a crash or
+  colour RAM being walked on after a few hundred redraws.
 
-The MEGA65 is a modern recreation of the never-released Commodore 65. This
-port compiles as a plain `c64`-target program (so it loads and runs in the
-MEGA65's C64 mode) but brings up the **VIC-IV** video chip through
-mega65-libc's `conioinit()`, giving a real per-cell colour + attribute text
-screen. Cards render as colour-bordered boxes with the value glyph, the same
-40-column style as the C128/CBM-510 ports, and sound uses the MEGA65's SID
-(directly mapped at `$D400` in C64 mode — no bank-switching, unlike the
-CBM-II port).
-
-Playing a card animates a **VIC-II hardware sprite** (`mega65spr.c`) gliding
-the card from its hand slot (or a CPU's seat) to the discard pile.
-
-The shared card logic (`cards.c`/`game.c`/`ai.c`) is reused unchanged;
-`mega65vid.c` (video), `mega65snd.c` (SID), `mega65spr.c` (sprite toss),
-`input.c` (keyboard + joystick) and the 40-column `ui.c` sit on top.
-
-Input is joystick (port 2) or keyboard — cursor left/right to pick a card,
-space/return to play, cursor-up to draw, or `1`-`9`/`0`/`A`-`J` to jump
-straight to a card.
-
-## Notes from bringing it up
-
-- **Direct VIC-IV via mega65-libc.** `mega65_init()` calls `conioinit()`
-  (which unlocks the VIC-IV), enables the reverse attribute for solid colour
-  swatches, and selects the upper/graphics font.
-- **Screen codes, not ASCII.** mega65-libc's `cputcxy()` writes raw screen
-  codes, so `mega65vid.c` translates PETSCII → screen code (so both text and
-  the PETSCII box-drawing glyphs render). The UI's string literals are kept
-  ASCII with `<ascii_charmap.h>` so that translation lines up.
-- **Linking mega65-libc.** Its `random.o` defines `rand`/`srand`, which clash
-  with cc65's stdlib (the shared game uses `rand()`), so the Makefile drops
-  `random.o` from the built `libmega65.a`.
-- **Frame timing.** `wait_vsync()` polls the C64-compatible VIC raster
-  (`$D012`).
-
-Verified end-to-end in Xemu's `xmega65` (`-headless -prgexit -screenshot`):
-title screen, and the dealt table + hand rendering in colour card boxes.
+Xemu auto-detects C65 mode from the `$2001` load address, so `-prg` alone is
+enough; `-prgmode 65` states it explicitly.
 
 ## Possible follow-ups
 
-The MEGA65 has more to offer that this first cut doesn't use yet:
-
-- **80-column mode** (VIC-IV H640) — NOT reachable from here: this port is a
-  cc65 `c64`-target binary that runs in the MEGA65's **C64 mode**, and the
-  C64 never supported 80 columns. Real 80-col needs the port re-based to
-  **MEGA65/C65 native mode**, which the cc65 `c64` target can't produce (a
-  different toolchain path — KickC/Calypsi/llvm-mos with C65 support, or
-  hand-rolled native code).
-- **Legal-move dimming / a reprogrammed palette** — the VBXE and X16 ports
-  gray out unplayable cards using custom dark-suit palette entries; doing the
-  same here needs VIC-IV palette reprogramming brought up (the `$D100/$D200/
-  $D300` writes weren't taking during bring-up).
+- **The card toss in native mode**, per the sprite note above.
+- **80x50.** `setscreensize()` accepts it, and the layout already derives
+  from `COLS`/`ROWS`.
+- **Legal-move dimming / a reprogrammed palette.** The VBXE and X16 ports
+  gray out unplayable cards using custom dark-suit palette entries. The
+  VIC-IV palette writes at `$D100/$D200/$D300` did not take during C64-mode
+  bring-up; native mode is the obvious place to retry, since C64 mode was
+  the likely reason.
 - **Stereo** using the second SID at `$D420`.

@@ -9,5 +9,7 @@
 .DS_Store
 .claude/
 
-# MEGA65: mega65-libc is cloned+built by the Makefile on demand
+# MEGA65: mega65-libc is cloned+built by the Makefile on demand -- once per
+# build, since the cc65 and llvm-mos artifacts are not interchangeable
 mega65/mega65-libc/
+mega65/mega65-libc-llvm/
