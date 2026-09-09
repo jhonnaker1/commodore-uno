@@ -17,8 +17,9 @@ so is `mega65snd.c` -- the SID is at `$D400` either way.
 
 For the C64-mode build: `cl65` on your `PATH` (from cc65). For the native
 build: the [llvm-mos SDK](https://github.com/llvm-mos/llvm-mos-sdk/releases),
-which ships **prebuilt for macOS, Linux and Windows** -- point `LLVM_MOS` at
-it (default `~/llvm-mos`). Both builds fetch and build their own copy of
+which ships **prebuilt for macOS, Linux and Windows** -- pass `LLVM_MOS=` the
+directory you unpacked it into, as with `XMEGA65`/`M65ROM` below. Both builds
+fetch and build their own copy of
 [mega65-libc](https://github.com/mega65/mega65-libc) on first use (it needs
 `git`); the two copies are built by different paths and are not
 interchangeable.

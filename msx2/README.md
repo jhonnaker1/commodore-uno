@@ -67,6 +67,8 @@ colourburst crystal.
 brew install sdcc
 make          # builds build/uno.rom
 make run      # boots it in openMSX
+make smoke    # build/smoke.rom -- a pipeline test, not the game
+make run-smoke
 ```
 
 No toolchain to build from source, which makes this the least painful port
@@ -84,6 +86,13 @@ globals out of ROM.
 The game occupies 11,296 bytes of the 16,384 available (5,088 free), so
 unlike the TI-99/4A port there is no bank switching: it is one flat ROM
 image.
+
+`src/smoke.c` is a separate cartridge that answers the questions the game
+build cannot ask cheaply, since a failure in any of them looks the same from
+outside: that an SDCC-built cartridge is found in its slot and boots at all,
+that SCREEN 5 comes up, that the palette really is programmable, and that the
+V9938's command engine draws. It was the first thing that ran on this
+machine, and it is what to reach for first if the game ever comes up black.
 
 ## Four things that bite on this hardware
 

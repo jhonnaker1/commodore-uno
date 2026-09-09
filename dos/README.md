@@ -208,3 +208,26 @@ better debugging channel than the screenshot-only loop the other ports get.
 For genuine 4.77MHz 8088 timing, load `build/uno.img` as floppy A: in
 [86Box](https://86box.net/) with machine = IBM XT and video = CGA. `make
 run-xt` prints the settings.
+
+## Checking it without looking at it
+
+Every other port in this repo can only be verified by screenshotting an
+emulator and eyeballing the result. DOS can do better, because a DOS program
+can write a file: it reports what it actually drew, the host reads that back,
+and layout becomes something a script can assert on.
+
+```sh
+make run-smoke       # CGA: renders the title screen, dumps build/SCREEN.TXT, prints it
+make run-smoke-ega   # EGA: build/ega-title.png, build/ega-table.png
+make run-smoke-vga   # VGA: build/vga-title.png, build/vga-table.png
+```
+
+`src/smoke.c` draws real screens through the real `ui.c` and then dumps the
+CGA text buffer as plain text *plus an attribute map*, so a wrong colour is
+as catchable as a wrong character. That is how a layout bug got caught that
+had slot numbers landing on top of the "YOUR HAND" label.
+
+A bitmap can't dump as text, so the EGA and VGA builds (`src/smoke_bmp.c`)
+write raw framebuffers instead and [`tools/dumptopng.py`](tools/dumptopng.py)
+decodes them into PNGs — unweaving EGA's four bit planes, or mapping mode
+13h's bytes through the palette. Same shape of loop for all three builds.

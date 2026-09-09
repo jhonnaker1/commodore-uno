@@ -28,16 +28,25 @@ much more capable video chip, built with [SDCC](https://sdcc.sourceforge.net/)
 and tested in [openMSX](https://openmsx.org/). The MS-DOS port is a sixth
 CPU family — Intel x86, the 8088 in real mode — built with
 [Open Watcom](https://open-watcom.github.io/) and tested in
-[DOSBox-X](https://dosbox-x.com/) and [86Box](https://86box.net/).
+[DOSBox-X](https://dosbox-x.com/) and [86Box](https://86box.net/). The
+MEGA65 is 6502-family, but cc65 has no target for it: the C64-mode build
+borrows the `c64` target and unlocks the VIC-IV at runtime, while the
+native-mode 80-column build — which cannot pretend to be a C64 at all —
+uses [llvm-mos](https://llvm-mos.org/) instead. Both are tested in
+[Xemu](https://github.com/lgblgblgb/xemu).
 
 Each platform is its own self-contained subdirectory sharing the same card
 game logic — `cards.c`, `game.c` and `ai.c` are byte-identical across all
-of them — with a platform-specific video, sound, and input layer underneath,
-since the hardware capabilities vary wildly across this lineup. Their
-headers are shared too, with one deliberate exception: the two 68000 ports
-pad and reorder the `Card` struct to satisfy the 68000's alignment rules,
-which the byte-addressable CPUs neither need nor can afford (the padding
-would double `GameState`). See the Atari ST/STE entry under Notes.
+eighteen C ports (the C64 OS one is 6502 assembly and shares no source) —
+with a platform-specific video, sound, and input layer underneath, since the
+hardware capabilities vary wildly across this lineup. Their
+headers are shared too, apart from what the 68000's alignment rules force:
+both 68000 ports add a pad member to `Card` in `cards.h` so it can never be
+copied by a `move.w` at an odd address, and the Atari ST goes further,
+reordering `GameState` in `game.h` to keep every Card-holding member at the
+front. The byte-addressable CPUs neither need that padding nor can afford it
+— it would double `GameState` — so those two headers are the only ones that
+differ anywhere in the repo. See the Atari ST/STE entry under Notes.
 
 **Prebuilt binaries** for every platform are attached to the
 [latest release (v1.0.7)](https://github.com/jhonnaker1/commodore-uno/releases/tag/v1.0.7)
@@ -52,7 +61,7 @@ instructions are in the release notes). To build from source instead, see
 | [`plus4/`](plus4) | Commodore Plus/4 | Complete — TED video/sound, stock font |
 | [`pet/`](pet) | Commodore PET 4032 (40-column, or 80-column 8032) | Complete — monochrome text UI, single-voice VIA beeper, keyboard only (no joystick port); `make run-8032` builds an alternate 80-column version for the PET 8032 (same hardware family, just double the columns) |
 | [`vic20/`](vic20) | Commodore VIC-20 (+memory expansion) | Complete — redirects the VIC's video matrix back to $1E00 to dodge a real rendering bug at the KERNAL's relocated $1000, color-coded suits (letter + color, since the VIC-20 has real per-cell color after all) |
-| [`atari/`](atari) | Atari 800XL (stock, or with a VBXE video board) | Complete — the standard build uses ANTIC text mode (no per-cell color, so cards use color letters + reverse-video selection like the VIC-20/PET), 4-channel POKEY sound; `make all-vbxe` builds an alternate version for an 800XL fitted with a [VBXE](https://vbxe.atari.org/) video board, using its real char+attribute 80-column text mode for solid per-suit colored card tiles plus toss/deal animations, a blinking cursor, and a win flourish — at C64-port feature parity (see [`atari/`](atari)) |
+| [`atari/`](atari) | Atari 800XL (stock, or with a VBXE video board) | Complete — the standard build uses ANTIC text mode (no per-cell color, so cards use color letters + reverse-video selection like the VIC-20/PET), 4-channel POKEY sound; `make all-vbxe` builds an alternate version for an 800XL fitted with a [VBXE](https://vbxe.atari.org/) video board, using its real char+attribute 80-column text mode for solid per-suit colored card tiles plus toss/deal animations, a blinking cursor, and a win flourish — at C64-port feature parity. A third build, `make all-vbxe-bmp`, drives the same board's **320x192 8bpp chunky bitmap** mode instead for pixel-art card faces, like the ST/Amiga/X16 bitmap builds (see [`atari/`](atari)) |
 | [`apple/`](apple) | Apple IIe (enhanced) | Complete — 40x24 text mode (no per-cell color, reverse-video selection like the VIC-20/PET/Atari), 1-bit speaker bit-banged for tones; ships as a ProDOS `.SYSTEM` file, see [`apple/`](apple) for how to get it onto a bootable disk image |
 | [`amiga/`](amiga) | Commodore Amiga (68000, Kickstart 2.0+) | Complete — a custom Intuition screen with a real 8-color palette (not the default Workbench screen's washed-out few shades) drawn through console.device with ANSI escape codes, 4-channel Paula sound with a generated sine-wave tone and volume envelope, keyboard input via IDCMP_VANILLAKEY (comma/period/'U' for movement instead of cursor keys — see Controls). Also ships a separate **bitmap-graphics** build (`make bmp`) that renders the whole game as pixel-art cards in a 320×256 16-colour screen, with the card bodies drawn as blitter `RectFill`s and text via the topaz ROM font — the same look as the Atari ST and X16/VBXE bitmap builds (see [`amiga/`](amiga)) |
 | [`cbm510/`](cbm510) | Commodore CBM-II (510/P500) | Complete — the one CBM-II model with a real VIC-II and SID (same chips as the C64, reached through cc65's `pokebsys()`/`peekbsys()` since they live in a separate bank-switched "system bank" plain pointers can't reach), full-color card borders and SID sound effects, same box-drawing charset as the C64/C128 (stock PETSCII, no custom chargen needed) |
@@ -82,6 +91,7 @@ cd pet && make run-8032 # build/uno8032.prg in xpet -model 8032
 cd vic20 && make run   # build/uno20.prg in xvic -memory all
 cd atari && make run XLXE_ROM=/path/to/your/atarixl.rom  # build/uno.xex in atari800
 cd atari && make all-vbxe  # build/unovbxe.xex for an 800XL with a VBXE video board (see atari/ for running it)
+cd atari && make all-vbxe-bmp  # build/unovbxebmp.xex -- the VBXE bitmap-graphics build (see atari/)
 cd apple && make      # build/uno.system -- see apple/ for the ProDOS disk-image step
 cd amiga && make      # build/uno -- needs m68k-amigaos-gcc on your PATH, see below
 cd amiga && make bmp  # build/unobmp -- the bitmap-graphics build (see amiga/)
@@ -214,6 +224,26 @@ instruction the saved state reads as "disabled", the matching `ei` is
 skipped, and interrupts stay off permanently: the frame counter stops and
 the game freezes mid-turn. Plain `di`/`ei` is the fix.
 
+The MEGA65's second build is the other painless one, and the only C compiler
+here aimed at a 6502-family machine that isn't cc65 — cc65 has no MEGA65
+target at all, so the native-mode 80-column build uses
+[llvm-mos](https://llvm-mos.org/) instead. Like SDCC and unlike the TMS9900,
+vbcc and Open Watcom toolchains here, it needs no source build: the SDK ships
+prebuilt for macOS, Linux and Windows. Unpack a
+[release](https://github.com/llvm-mos/llvm-mos-sdk/releases) and point
+`LLVM_MOS` at it:
+
+```sh
+cd mega65 && make               # build/uno.prg         C64 mode, 40 col (cc65)
+cd mega65 && make native LLVM_MOS=/path/to/llvm-mos   # build/uno-native.prg, 80 col
+```
+
+Both builds fetch and build their own copy of
+[mega65-libc](https://github.com/mega65/mega65-libc) on first use, into
+separate directories — the cc65 and llvm-mos build paths produce
+different, non-interchangeable libraries. Why 80 columns needs native mode at
+all is [`mega65/README.md`](mega65/README.md)'s main subject.
+
 The C64 and C128 versions use a custom character set (real chargen ROM
 glyphs for codes 0-127, hand-drawn card-art glyphs above that). The
 generated headers are checked in under `src/charset_data.h` /
@@ -247,14 +277,28 @@ the host.
 Common across every port: joystick (where the hardware has a port) or
 keyboard — cursor left/right to pick a card, space/return to play or
 confirm, cursor up to draw, or jump straight to a card with `1`-`9`, `0`,
-`A`-`J`. The Amiga port is the one exception: its cursor keys didn't work
-reliably through the console input path, so movement is comma/period
-(left/right) and `U` (draw) instead — the same fallback the C128 needed
-for its own unreachable dedicated cursor keys. The Atari ST/STE port is
-keyboard-only (cursor keys and space): the ST's joystick ports sit behind
-the IKBD, which reports sticks only after being switched out of mouse mode
-and serviced on an interrupt vector, and Hatari can map the cursor keys to
-a joystick anyway.
+`A`-`J`.
+
+Five machines can't offer cursor keys and substitute for them. Four use the
+same comma/period fallback — `,` and `.` to move, `U` to draw (`D` is spoken
+for by the `A`-`J` quick-play keys) — for four unrelated reasons. The
+**C128** got there first: its dedicated cursor keys proved unreachable both
+by a raw CIA1 matrix scan (they sit outside the standard 8x8 matrix) and
+through the KERNAL buffer, which goes dead once the screen moves to VIC bank
+2. The **Amiga**'s cursor keys didn't come through the console input path
+reliably. The **TI-99/4A** has no dedicated cursor keys at all — the arrows
+are FCTN+S/D/E/X, which KSCAN returns as control codes rather than plain
+ASCII. And the **F256** reads the FoenixMCP kernel's event queue, where the
+letter and punctuation keys are the ones carrying a definite ASCII code. The
+**ZX Spectrum** has no cursor keys either, and uses the Sinclair-era
+`O`/`P`/`Q` keys-as-joystick scheme instead.
+
+Two more are keyboard-only rather than differently-keyed. The **Atari
+ST/STE** keeps cursor keys and space but has no joystick support: the ST's
+ports sit behind the IKBD, which reports sticks only after being switched
+out of mouse mode and serviced on an interrupt vector, and Hatari can map
+the cursor keys to a joystick anyway. The **CoCo 3** and **PET** are
+keyboard-only too — the PET has no joystick port at all.
 
 ## Notes
 
