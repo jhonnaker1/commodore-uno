@@ -33,12 +33,13 @@ LIBC_LLVM_INC = $(MEGA65_LIBC_LLVM)/include
 LIBC_LLVM_A = $(MEGA65_LIBC_LLVM)/build/src/libmega65libc.a
 
 # llvm-mos SDK (prebuilt; https://github.com/llvm-mos/llvm-mos-sdk/releases).
-LLVM_MOS ?= /Users/jhonnaker/llvm-mos
+# Point it at wherever you unpacked it: make native LLVM_MOS=/path/to/llvm-mos
+LLVM_MOS ?= $(HOME)/llvm-mos
 M65CC = $(LLVM_MOS)/bin/mos-mega65-clang
 
-# MEGA65 emulator (LGB Xemu) + ROM, for `make run`.
-XMEGA65 ?= /Users/jhonnaker/xemu/bin/xmega65
-M65ROM ?= /Users/jhonnaker/xemu/mega65-920395.bin
+# MEGA65 emulator (LGB Xemu) + ROM, for `make run`. Supply your own ROM.
+XMEGA65 ?= $(HOME)/xemu/bin/xmega65
+M65ROM ?= $(HOME)/xemu/mega65-920395.bin
 
 .PHONY: all native run run-native clean
 

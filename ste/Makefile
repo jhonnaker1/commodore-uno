@@ -2,7 +2,7 @@
 # vasm + vlink with the `tos` config); there is no Homebrew package, so see
 # README.md for how it was built. Point VBCC at your install:
 #   make VBCC=/path/to/vbcc
-VBCC ?= /Users/jhonnaker/vbcc
+VBCC ?= $(HOME)/vbcc
 # vc shells out to vbccm68k/vasmm68k_mot/vlink by name, so they must be on PATH
 VC = VBCC=$(VBCC) PATH=$(VBCC)/bin:$$PATH $(VBCC)/bin/vc +tos
 CFLAGS = -O=1023 -DNDEBUG
@@ -19,7 +19,7 @@ OUT_SMOKE = build/SMOKE.TOS
 HDRS = $(wildcard src/*.h)
 
 # Hatari needs a TOS/EmuTOS ROM image; point TOS_ROM at your own.
-TOS_ROM ?= /Users/jhonnaker/hatari/rom/etos512us.img
+TOS_ROM ?= $(HOME)/hatari/rom/etos512us.img
 HD = build/hd
 
 .PHONY: all smoke run run-smoke clean

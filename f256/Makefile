@@ -17,7 +17,7 @@ SMOKE_PGZ = build/uno-smoke.pgz
 
 # macOS `make run`: copies the PGZ onto a working copy of your SD image and
 # launches the foenix MAME (then type `/- uno` at the SuperBASIC prompt).
-MAME_DIR ?= /Users/jhonnaker/Downloads/mame-foenix256k
+MAME_DIR ?= $(HOME)/Downloads/mame-foenix256k
 SDCARD   ?= $(MAME_DIR)/sdcard.img
 
 .PHONY: all smoke run clean

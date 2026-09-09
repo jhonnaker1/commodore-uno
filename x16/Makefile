@@ -16,7 +16,7 @@ DEMO_SRC = src/main_bmp.c src/vbmp.c src/graph.s src/cards.c
 DEMO_OUT = build/unobmpdemo.prg
 
 # Path to your x16emu install (contains x16emu + rom.bin)
-X16EMU ?= /Users/jhonnaker/x16emu_macos_m1-r48
+X16EMU ?= $(HOME)/x16emu_macos_m1-r48
 
 .PHONY: all bmp bmpdemo run run-bmp clean
 

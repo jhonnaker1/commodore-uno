@@ -231,7 +231,7 @@ target at all, so the native-mode 80-column build uses
 vbcc and Open Watcom toolchains here, it needs no source build: the SDK ships
 prebuilt for macOS, Linux and Windows. Unpack a
 [release](https://github.com/llvm-mos/llvm-mos-sdk/releases) and point
-`LLVM_MOS` at it:
+`LLVM_MOS` at it (it defaults to `$HOME/llvm-mos`):
 
 ```sh
 cd mega65 && make               # build/uno.prg         C64 mode, 40 col (cc65)

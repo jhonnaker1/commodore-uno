@@ -16,8 +16,8 @@ make                                   # build/uno.prg
 make run X16EMU=/path/to/x16emu_dir    # launches build/uno.prg in x16emu
 ```
 
-`make run` defaults `X16EMU` to `/Users/jhonnaker/x16emu_macos_m1-r48`;
-point it at wherever your emulator (and its `rom.bin`) live. To run by hand:
+`make run` defaults `X16EMU` to `$HOME/x16emu_macos_m1-r48`; point it at
+wherever your emulator (and its `rom.bin`) live. To run by hand:
 
 ```sh
 cd /path/to/x16emu_dir
