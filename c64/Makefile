@@ -5,13 +5,16 @@ OUT = build/uno.prg
 .PHONY: all charset run clean
 
 # charset_data.h/charset_codes.h are pre-generated and checked in, so a
-# fresh clone builds out of the box. Run `make charset` explicitly (and
-# edit CHARGEN_PATH in tools/gen_charset.py to point at your own dumped
-# C64 chargen ROM) only if you want to regenerate them.
+# fresh clone builds out of the box. `make charset` regenerates them, and
+# needs your own dumped C64 chargen ROM -- it isn't redistributable, so it
+# is not in this repo. Point CHARGEN at it:
+#   make charset CHARGEN=/path/to/chargen
+CHARGEN ?= $(HOME)/Downloads/WinVICE-3.1-x64/C64/chargen
+
 all: $(OUT)
 
 charset:
-	python3 tools/gen_charset.py
+	CHARGEN="$(CHARGEN)" python3 tools/gen_charset.py
 
 $(OUT): $(SRC) src/charset_data.h src/charset_codes.h
 	cl65 -t $(CC65_TARGET) -O -o $(OUT) $(SRC)

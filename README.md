@@ -248,9 +248,12 @@ The C64 and C128 versions use a custom character set (real chargen ROM
 glyphs for codes 0-127, hand-drawn card-art glyphs above that). The
 generated headers are checked in under `src/charset_data.h` /
 `src/charset_codes.h`, so a fresh clone builds without needing the ROM.
-Regenerating them (`make charset`) requires pointing `CHARGEN_PATH` in
-`tools/gen_charset.py` at your own dumped C64 chargen ROM — the ROM itself
-isn't included here.
+Regenerating them needs your own dumped C64 chargen ROM, which isn't
+redistributable and so isn't included here — point `CHARGEN` at it:
+
+```sh
+cd c64 && make charset CHARGEN=/path/to/chargen
+```
 
 
 The MS-DOS port needs Open Watcom, the only actively-maintained compiler
@@ -313,8 +316,8 @@ each machine that cost the most time to work out.
   and edges, big digits, action-card icons, a card-back pattern, the
   cursor. That needs a dumped chargen ROM, which isn't redistributable, so
   the generated `charset_data.h`/`charset_codes.h` are checked in and a
-  fresh clone builds without one (`make charset` regenerates them if you
-  point `CHARGEN_PATH` at your own dump). `vic_init()` then moves the whole
+  fresh clone builds without one (`make charset CHARGEN=...` regenerates
+  them from your own dump). `vic_init()` then moves the whole
   VIC bank to $8000 through CIA2's port A, putting the screen matrix at
   $8000 and the charset at $8800 -- with the sprite *pointers* at screen
   base + $3F8, tucked into the 24 bytes at the end of the 1K screen block

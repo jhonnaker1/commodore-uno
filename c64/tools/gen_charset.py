@@ -7,10 +7,16 @@ so normal PETSCII text/menus render correctly.
 Chars 128-255 are custom card-art glyphs (box corners/edges, big digits,
 action-card icons, card-back pattern, cursor) defined here as 8x8 bitmaps.
 """
+import os
 import sys
 import struct
 
-CHARGEN_PATH = "/Users/jhonnaker/Downloads/WinVICE-3.1-x64/C64/chargen"
+# A dumped C64 character ROM. Not redistributable, so it is not in this
+# repo -- the generated headers are checked in instead, and `make charset`
+# is only needed to regenerate them. Point CHARGEN at your own dump:
+#   make charset CHARGEN=/path/to/chargen
+CHARGEN_PATH = os.environ.get(
+    "CHARGEN", os.path.expanduser("~/Downloads/WinVICE-3.1-x64/C64/chargen"))
 OUT_PATH = "build/charset.bin"
 HEADER_PATH = "src/charset_data.h"
 CODES_HEADER_PATH = "src/charset_codes.h"
@@ -285,8 +291,15 @@ def glyph_to_bytes(rows):
 
 
 def main():
-    with open(CHARGEN_PATH, "rb") as f:
-        chargen = f.read()
+    try:
+        with open(CHARGEN_PATH, "rb") as f:
+            chargen = f.read()
+    except OSError as e:
+        print("cannot read chargen ROM %s: %s" % (CHARGEN_PATH, e),
+              file=sys.stderr)
+        print("point CHARGEN at your own dump: "
+              "make charset CHARGEN=/path/to/chargen", file=sys.stderr)
+        sys.exit(1)
     if len(chargen) < 2048:
         print("chargen file too small", file=sys.stderr)
         sys.exit(1)
