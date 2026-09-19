@@ -21,12 +21,30 @@ NEEDS_PURCHASED_ROMS = {"c64os"}
 SKIP = re.compile(r"^(run|clean|install|charset|all)$|^run-")
 
 
+# Artefact paths assigned to a variable, e.g. `VDC_OUT = build/uno128vdc.prg`.
+# These matter because some shipped binaries have NO phony target at all: the
+# C128's VDC build and the PET's 8032 build are reached through `run-vdc` and
+# `run-8032`, which launch an emulator and are skipped above. Naming the file
+# builds them without one. Missing these meant the sweep claimed to cover
+# "every alternate target" while skipping two RELEASED artefacts.
+OUT_VAR = re.compile(r"^\s*(\w+)\s*[:?]?=\s*(build/\S+)\s*$", re.M)
+
+
 def targets_for(mk):
+    text = mk.read_text()
     phony = []
-    for line in mk.read_text().splitlines():
+    for line in text.splitlines():
         if line.startswith(".PHONY:"):
             phony += line.split(":", 1)[1].split()
-    return [t for t in dict.fromkeys(phony) if t and not SKIP.match(t)]
+    targets = [t for t in dict.fromkeys(phony) if t and not SKIP.match(t)]
+    files = []
+    for var, path in OUT_VAR.findall(text):
+        # Only if the Makefile actually has a RULE for it. Without this a
+        # staging directory (ste's `HD = build/hd`) is mistaken for an
+        # artefact and the sweep fails on "No rule to make target".
+        if re.search(r"^\$\(" + var + r"\)\s*:", text, re.M):
+            files.append(path)
+    return targets + list(dict.fromkeys(files))
 
 
 MISSING_TOOL = re.compile(
