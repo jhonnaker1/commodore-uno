@@ -13,3 +13,7 @@
 # build, since the cc65 and llvm-mos artifacts are not interchangeable
 mega65/mega65-libc/
 mega65/mega65-libc-llvm/
+
+# Python bytecode from tools/
+__pycache__/
+*.pyc

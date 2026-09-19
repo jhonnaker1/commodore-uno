@@ -109,6 +109,28 @@ cd msx2 && make run  # build/uno.rom in openMSX (brew install sdcc; no system RO
 cd dos && make run   # build/UNO.EXE in DOSBox-X emulating CGA (also: make ega, make vga, make img)
 ```
 
+### Checking the whole repo
+
+Two cross-port targets at the top level. `make check` is static and takes a
+second, so there is no excuse to skip it; `make build-all` needs all six
+toolchains and takes minutes, so it is deliberately separate.
+
+```sh
+make check      # the shared-source invariants below, plus Makefile hygiene
+make build-all  # clean-build every port and every alternate target
+```
+
+`make check` is what keeps the "byte-identical" claim above honest. It
+discovers the ports from the filesystem rather than a list, so a new port
+joins the check by existing, and it knows about exactly two permitted
+exceptions -- the 68000 pad in `cards.h` and the Atari ST's `GameState`
+reorder. Anything else differing is a fork, and it says so.
+
+`make build-all` tells a missing toolchain apart from a broken build: if
+`m68k-amigaos-gcc` is not on your `PATH` the Amiga targets are reported as
+skipped, not failed, because a toolchain you have not installed is not a
+defect in the code.
+
 `make` alone just builds; `make clean` removes build artifacts.
 
 The Apple II port doesn't have a `make run` target: cc65 doesn't produce a

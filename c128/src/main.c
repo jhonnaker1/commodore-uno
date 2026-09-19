@@ -66,7 +66,7 @@ static void animate_deal(GameState *g) {
         g->players[0].count = (unsigned char)(i + 1);
         wait_vsync();
         ui_draw_hand(g, 0);
-        pause_frames(4);
+        pause_frames(2);
     }
     g->players[0].count = full_count;
 }
@@ -81,25 +81,25 @@ static unsigned char handle_post_play_flags(GameState *g) {
         wait_vsync();
         ui_event_skip(g->flag_skip);
         sfx_skip();
-        pause_frames(70);
+        pause_frames(35);
     }
     if (g->flag_reverse != NONE) {
         wait_vsync();
         ui_event_reverse(g->flag_reverse);
         sfx_reverse();
-        pause_frames(60);
+        pause_frames(30);
     }
     if (g->flag_draw_player != NONE) {
         wait_vsync();
         ui_event_draw(g->flag_draw_player, g->flag_draw_count);
         sfx_draw_multi(g->flag_draw_count);
-        pause_frames(80);
+        pause_frames(40);
     }
     if (g->flag_uno_player != NONE) {
         wait_vsync();
         ui_event_uno(g->flag_uno_player);
         sfx_uno();
-        pause_frames(80);
+        pause_frames(40);
     }
     return 0;
 }
@@ -145,7 +145,7 @@ static unsigned char resolve_pending_wd4(GameState *g) {
         }
         ui_draw_opponents(g);
         ui_draw_hand(g, 0);
-        pause_frames(90);
+        pause_frames(45);
     } else {
         resolve_wd4(g, challenged);
     }
@@ -261,7 +261,7 @@ static unsigned char human_turn(GameState *g) {
             ui_event_drew_one(0);
             ui_draw_opponents(g);
             ui_draw_hand(g, g->players[0].count - 1);
-            pause_frames(50);
+            pause_frames(25);
             if (is_legal(g, drawn)) {
                 idx = g->players[0].count - 1;
                 chosen = (drawn.color == COLOR_WILD) ? human_pick_color(g) : 0;
@@ -301,7 +301,7 @@ static unsigned char cpu_turn(GameState *g, unsigned char idx) {
     ui_draw_table(g);
     ui_draw_hand(g, 0);
     ui_event_thinking(idx);
-    pause_frames(50);
+    pause_frames(25);
 
     ui_opponent_pos(idx, &col, &row);
 
@@ -312,7 +312,7 @@ static unsigned char cpu_turn(GameState *g, unsigned char idx) {
         wait_vsync();
         ui_event_drew_one(idx);
         ui_draw_opponents(g);
-        pause_frames(60);
+        pause_frames(30);
         if (is_legal(g, drawn)) {
             hand_idx = g->players[idx].count - 1;
             chosen = (drawn.color == COLOR_WILD) ? ai_choose_color(g, idx) : 0;
@@ -381,7 +381,7 @@ int main(void) {
             unsigned char f;
             for (f = 0; f < 32; f++) {
                 ui_win_flourish_step(f);
-                pause_frames(4);
+                pause_frames(2);
             }
             vic_set_border(COL_BLACK);
         }

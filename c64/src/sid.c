@@ -47,9 +47,19 @@ static const unsigned int NOTE_FREQ[8] = {
     4459, 5002, 5615, 5949, 6678, 7495, 8412, 8917
 };
 
+/* $D012 holds only the LOW 8 BITS of the VIC-II's 9-bit raster counter
+   (0-311 PAL, 0-262 NTSC), so `== 0` matches line 0 AND line 256: the old
+   `!= 0` / `== 0` pair completed TWICE per frame, at uneven 256-line and
+   56-line intervals, which paced every animation and sound duration at
+   roughly double speed and with visible judder (measured in VICE: 100
+   waits took 60 jiffies where a true frame wait took 121).
+   Waiting on a high band instead needs only the low byte: 240-255 occurs
+   exactly once per frame on both standards, because 496-511 never happens.
+   Same idiom as mega65/src/mega65vid.c, which had it right all along. */
+#define RASTER_BAND 0xF0
 static void wait_frame(void) {
-    while (VIC_RASTER != 0) {}
-    while (VIC_RASTER == 0) {}
+    while (VIC_RASTER >= RASTER_BAND) {}
+    while (VIC_RASTER < RASTER_BAND) {}
 }
 
 static void hold(unsigned char frames) {
@@ -138,7 +148,7 @@ void sfx_card_play(void) {
 void sfx_draw(void) {
     note1_on(3000, WAVE_NOISE, 0x06);
     note2_on(1800, WAVE_TRIANGLE, 0x05);
-    hold(6);
+    hold(3);
     note1_off(WAVE_NOISE);
     note2_off(WAVE_TRIANGLE);
 }
@@ -151,10 +161,10 @@ void sfx_draw_multi(unsigned char count) {
     for (i = 0; i < n; i++) {
         note1_on((unsigned int)(2600 - i * 200), WAVE_NOISE, 0x05);
         note2_on((unsigned int)(1600 - i * 100), WAVE_TRIANGLE, 0x04);
-        hold(4);
+        hold(2);
         note1_off(WAVE_NOISE);
         note2_off(WAVE_TRIANGLE);
-        hold(2);
+        hold(1);
     }
 }
 
@@ -167,10 +177,10 @@ void sfx_invalid(void) {
     SID_V3_CTRL = WAVE_TRIANGLE | GATE;
 
     note1_on(1100, (unsigned char)(WAVE_TRIANGLE | RING_MOD), 0x05);
-    hold(8);
+    hold(4);
     note1_off((unsigned char)(WAVE_TRIANGLE | RING_MOD));
     note1_on(800, (unsigned char)(WAVE_TRIANGLE | RING_MOD), 0x05);
-    hold(8);
+    hold(4);
     note1_off((unsigned char)(WAVE_TRIANGLE | RING_MOD));
 
     SID_V3_CTRL = 0;
@@ -186,11 +196,11 @@ void sfx_uno(void) {
         note1_on(NOTE_FREQ[7], WAVE_PULSE, 0x09);
         note2_on(NOTE_FREQ[4], WAVE_PULSE, 0x09);
         set_filter_cutoff(1800);
-        hold(6);
+        hold(3);
         note1_off(WAVE_PULSE);
         note2_off(WAVE_PULSE);
         set_filter_cutoff(600);
-        hold(2);
+        hold(1);
     }
     SID_RES_FILT = 0x00;
     SID_MODE_VOL = 0x0F;
@@ -234,7 +244,7 @@ void sfx_challenge_success(void) {
     static const unsigned char notes[3] = {2, 5, 7};
     for (i = 0; i < 3; i++) {
         note1_on(NOTE_FREQ[notes[i]], WAVE_PULSE, 0x07);
-        hold(5);
+        hold(3);
         note1_off(WAVE_PULSE);
     }
 }
@@ -242,7 +252,7 @@ void sfx_challenge_success(void) {
 /* A single low buzz: the challenge was wrong. */
 void sfx_challenge_fail(void) {
     note1_on(700, WAVE_SAWTOOTH, 0x05);
-    hold(12);
+    hold(6);
     note1_off(WAVE_SAWTOOTH);
 }
 
@@ -268,7 +278,7 @@ void sfx_win(void) {
 
     for (i = 0; i < 6; i++) {
         note1_on(NOTE_FREQ[tune[i]], WAVE_PULSE, 0x09);
-        hold(8);
+        hold(4);
         note1_off(WAVE_PULSE);
     }
 }

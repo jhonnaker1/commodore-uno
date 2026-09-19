@@ -19,9 +19,19 @@
    higher pitch, the opposite of SID's convention. Channel 2/noise is
    left alone entirely to keep this reliable. */
 
+/* $FF1D holds only the LOW 8 BITS of TED's 9-bit raster counter
+   (0-311 PAL, 0-261 NTSC), so `== 0` matches line 0 AND line 256: the old
+   `!= 0` / `== 0` pair completed TWICE per frame, at uneven 256-line and
+   56-line intervals, which paced every animation and sound duration at
+   roughly double speed and with visible judder (measured in VICE: 100
+   waits took 60 jiffies where a true frame wait took 121).
+   Waiting on a high band instead needs only the low byte: 240-255 occurs
+   exactly once per frame on both standards, because 496-511 never happens.
+   Same idiom as mega65/src/mega65vid.c, which had it right all along. */
+#define RASTER_BAND 0xF0
 static void wait_frame(void) {
-    while (TED_RASTER_LO != 0) {}
-    while (TED_RASTER_LO == 0) {}
+    while (TED_RASTER_LO >= RASTER_BAND) {}
+    while (TED_RASTER_LO < RASTER_BAND) {}
 }
 
 static void hold(unsigned char frames) {
@@ -50,14 +60,14 @@ void tsound_init(void) {
 /* Bright short blip. */
 void sfx_card_play(void) {
     note_on(180);
-    hold(4);
+    hold(2);
     note_off();
 }
 
 /* Low thump. */
 void sfx_draw(void) {
     note_on(900);
-    hold(6);
+    hold(3);
     note_off();
 }
 
@@ -67,19 +77,19 @@ void sfx_draw_multi(unsigned char count) {
     unsigned char i;
     for (i = 0; i < n; i++) {
         note_on((unsigned int)(900 - i * 60));
-        hold(4);
-        note_off();
         hold(2);
+        note_off();
+        hold(1);
     }
 }
 
 /* Two low descending tones for an illegal move. */
 void sfx_invalid(void) {
     note_on(1400);
-    hold(8);
+    hold(4);
     note_off();
     note_on(1800);
-    hold(8);
+    hold(4);
     note_off();
 }
 
@@ -88,9 +98,9 @@ void sfx_uno(void) {
     unsigned char i;
     for (i = 0; i < 2; i++) {
         note_on(150);
-        hold(6);
+        hold(3);
         note_off();
-        hold(2);
+        hold(1);
     }
 }
 
@@ -126,7 +136,7 @@ void sfx_challenge_success(void) {
     unsigned char i;
     for (i = 0; i < 3; i++) {
         note_on(notes[i]);
-        hold(5);
+        hold(3);
         note_off();
     }
 }
@@ -134,7 +144,7 @@ void sfx_challenge_success(void) {
 /* Single low buzz: the challenge failed. */
 void sfx_challenge_fail(void) {
     note_on(1600);
-    hold(12);
+    hold(6);
     note_off();
 }
 
@@ -144,7 +154,7 @@ void sfx_win(void) {
     unsigned char i;
     for (i = 0; i < 6; i++) {
         note_on(notes[i]);
-        hold(8);
+        hold(4);
         note_off();
     }
 }

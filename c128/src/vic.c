@@ -42,9 +42,19 @@ static const unsigned char sprite_data[63] = {
    on the char-base bits (see vic_init()), so we have to keep re-winning
    that fight every frame rather than just building to its preferred
    value the way we do for the screen-address bits. */
+/* $D012 holds only the LOW 8 BITS of the VIC-II's 9-bit raster counter
+   (0-311 PAL, 0-262 NTSC), so `== 0` matches line 0 AND line 256: the old
+   `!= 0` / `== 0` pair completed TWICE per frame, at uneven 256-line and
+   56-line intervals, which paced every animation and sound duration at
+   roughly double speed and with visible judder (measured in VICE: 100
+   waits took 60 jiffies where a true frame wait took 121).
+   Waiting on a high band instead needs only the low byte: 240-255 occurs
+   exactly once per frame on both standards, because 496-511 never happens.
+   Same idiom as mega65/src/mega65vid.c, which had it right all along. */
+#define RASTER_BAND 0xF0
 void wait_vsync(void) {
-    while (VIC_RASTER != 0) {}
-    while (VIC_RASTER == 0) {}
+    while (VIC_RASTER >= RASTER_BAND) {}
+    while (VIC_RASTER < RASTER_BAND) {}
     VIC_MEMCTL = 0x18;
 }
 
