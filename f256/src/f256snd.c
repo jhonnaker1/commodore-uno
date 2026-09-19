@@ -41,9 +41,19 @@
 #define RING_MOD 0x04
 #define GATE 0x01
 
-/* Approximate 16-bit SID frequency register values for C4..C5. */
+/* 16-bit SID frequency register values for C4..C5, computed for THIS
+   machine's SID clock rather than inherited from the C64 port.
+
+       Fn = Hz * 2^24 / clock
+
+   The F256's two SIDs are clocked at 1022727 Hz (confirmed from MAME's
+   f256k machine description), which is the NTSC rate -- not the C64's
+   PAL 985248 Hz. This table was originally copied from c64/src/sid.c
+   verbatim, where it is correct for PAL; against the F256's faster clock
+   the same register values came out about 65 cents sharp, two-thirds of
+   a semitone. Recomputed here, every note is within 0.15 cents. */
 static const unsigned int NOTE_FREQ[8] = {
-    4459, 5002, 5615, 5949, 6678, 7495, 8412, 8917
+    4292, 4817, 5407, 5729, 6430, 7218, 8102, 8584
 };
 
 static void hold(unsigned char frames) {

@@ -37,7 +37,12 @@
 #define RING_MOD 0x04
 #define GATE 0x01
 
-/* Approximate 16-bit SID frequency register values for C4..C5 (PAL clock). */
+/* 16-bit SID frequency register values for C4..C5, Fn = Hz * 2^24 / clock
+   at the PAL clock of 985248 Hz -- accurate to under 1.5 cents there.
+   On an NTSC machine (1022730 Hz) the same values come out about 65 cents
+   sharp; correcting that would mean picking the table at runtime off the
+   region, which these effects don't warrant. See f256/src/f256snd.c,
+   whose SID runs at the NTSC rate and so needs its own table. */
 static const unsigned int NOTE_FREQ[8] = {
     4459, 5002, 5615, 5949, 6678, 7495, 8412, 8917
 };
