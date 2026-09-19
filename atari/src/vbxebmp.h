@@ -32,7 +32,16 @@
 #define VBMP_CARD_W 34
 #define VBMP_CARD_H 48
 
-void vbmp_init(void);
+/* vbmp_init() return codes -- same meanings as the text driver's, since
+   both probe for the same FX core. VBXE is an add-on, so a caller has to
+   be ready for it not to be there. */
+#define VBXE_OK 0
+#define VBXE_NOT_FOUND 1   /* nothing answering at $D6xx or $D7xx */
+#define VBXE_WRONG_CORE 2  /* VBXE present, but the GTIA-emu core */
+
+unsigned char vbmp_init(void);
+/* Prints why vbmp_init() failed, using the stock OS screen editor. */
+void vbmp_report_missing(unsigned char status);
 void vbmp_wait_vsync(void);
 /* set palette entry idx (0-255) to 8-bit r,g,b */
 void vbmp_palette(unsigned char idx, unsigned char r, unsigned char g, unsigned char b);

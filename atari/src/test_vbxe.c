@@ -4,7 +4,11 @@
    the game) -- confirms the overlay initializes, colored text renders,
    and the driver's tile colors are usable directly. */
 int main(void) {
-    vbxe_init();
+    unsigned char status = vbxe_init();
+    if (status != VBXE_OK) {
+        vbxe_report_missing(status);
+        return 1;
+    }
     scr_puts(0, 0, "VBXE DRIVER OK - HELLO WORLD", COL_WHITE);
     scr_puts(0, 1, "RED", COL_RED);
     scr_puts(0, 2, "YELLOW", COL_YELLOW);

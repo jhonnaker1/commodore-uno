@@ -1,15 +1,19 @@
 #include <string.h>
+#include <conio.h>
 #include "vbxevid.h"
 
-/* Register base $D6xx: the more common of the two supported addresses
-   ($D6xx or $D7xx) per VBXE's own docs -- most VBXE software assumes
-   this one and won't adapt to $D7xx, so this doesn't bother making it
-   configurable. */
-#define VBXE_BASE 0xD640
-#define VIDEO_CONTROL (*(unsigned char *)(VBXE_BASE + 0x00))
-#define XDL_ADR0 (*(unsigned char *)(VBXE_BASE + 0x01))
-#define XDL_ADR1 (*(unsigned char *)(VBXE_BASE + 0x02))
-#define XDL_ADR2 (*(unsigned char *)(VBXE_BASE + 0x03))
+/* VBXE decodes at one of two bases: slot 0 at $D6xx, slot 1 at $D7xx.
+   Most VBXE software assumes $D6xx, but probing both costs two reads,
+   so vbxe_detect() picks the live one and every register below is
+   indexed off it. The FX core register file starts at base+$40, which
+   is what vbxe_regs points at (so the offsets here read the same as the
+   $D640-relative ones this driver was brought up with). */
+static unsigned char *vbxe_regs = (unsigned char *)0xD640;
+
+#define VIDEO_CONTROL (vbxe_regs[0x00])
+#define XDL_ADR0 (vbxe_regs[0x01])
+#define XDL_ADR1 (vbxe_regs[0x02])
+#define XDL_ADR2 (vbxe_regs[0x03])
 /* Palette-programming registers as used by the FX core (and by every
    working reference: Cactus, ansivbxe, Piotr Fusik's st2vbxe). NOTE: the
    older VBXE manual documents these same addresses as an MSEL/MB0-3
@@ -18,11 +22,11 @@
    the palette (index/RGB land in the wrong slots), which renders text in
    a colour indistinguishable from its background (looks like blank
    glyphs) and gives wrong backgrounds. */
-#define CSEL (*(unsigned char *)(VBXE_BASE + 0x04)) /* colour index 0-255 */
-#define PSEL (*(unsigned char *)(VBXE_BASE + 0x05)) /* palette 0 or 1 */
-#define CR (*(unsigned char *)(VBXE_BASE + 0x06))   /* red   */
-#define CG (*(unsigned char *)(VBXE_BASE + 0x07))   /* green */
-#define CB (*(unsigned char *)(VBXE_BASE + 0x08))   /* blue  */
+#define CSEL (vbxe_regs[0x04]) /* colour index 0-255 */
+#define PSEL (vbxe_regs[0x05]) /* palette 0 or 1 */
+#define CR (vbxe_regs[0x06])   /* red   */
+#define CG (vbxe_regs[0x07])   /* green */
+#define CB (vbxe_regs[0x08])   /* blue  */
 
 /* MEMAC window A, FX-core protocol ($D65E/$D65F), confirmed against
    Altirra's own vbxe.cpp. The old v1.0-beta manual's MA_CPU register at
@@ -35,8 +39,66 @@
                      bits0-1 = window size (4K << n)
      MEMAC_BANK_SEL: bit7 = enable, bits0-6 = VRAM bank in 4KB units
                      (masked to the window size, e.g. & $7E for 8K) */
-#define MEMAC_CONTROL (*(unsigned char *)(VBXE_BASE + 0x1E))
-#define MEMAC_BANK_SEL (*(unsigned char *)(VBXE_BASE + 0x1F))
+#define MEMAC_CONTROL (vbxe_regs[0x1E])
+#define MEMAC_BANK_SEL (vbxe_regs[0x1F])
+
+/* The read side of base+$00 ($D640/$D740) is CORE_VERSION: $10 is the FX
+   core -- the only one with the XDL, MEMAC window and palette registers
+   this driver needs -- and $11 is the GTIA-emu core, which has none of
+   them. A machine with no VBXE floats $FF back from unused I/O space, so
+   a plain equality test against $10 is enough to tell all three apart.
+   Reading is side-effect-free, which is why the probe is safe to run on
+   hardware that has no VBXE fitted.
+     Before this check existed the base was hardcoded and never verified:
+   on a stock Atari the driver wrote into open I/O, the writes went
+   nowhere, and the game came up as garbage rather than saying why. */
+#define CORE_VERSION_FX 0x10
+#define CORE_VERSION_GTIA 0x11
+
+static unsigned char detect_core(void) {
+    unsigned char *base;
+    unsigned char ver;
+    unsigned char slot;
+
+    for (slot = 0; slot < 2; slot++) {
+        base = (unsigned char *)(slot == 0 ? 0xD640 : 0xD740);
+        ver = base[0x00];
+        if (ver == CORE_VERSION_FX) {
+            vbxe_regs = base;
+            return VBXE_OK;
+        }
+        if (ver == CORE_VERSION_GTIA) {
+            return VBXE_WRONG_CORE;
+        }
+    }
+    return VBXE_NOT_FOUND;
+}
+
+/* Reported through the stock OS screen editor, not this driver's own
+   scr_puts(): if we are here the overlay never came up, so conio is the
+   only thing that can still put text on screen. It lives here rather than
+   in main_vbxe.c because conio.h drags in atari.h, whose COLOR_RED/GREEN/
+   BLUE collide with the suit constants in cards.h -- this file doesn't
+   include cards.h, so it is the one place the two can coexist. */
+void vbxe_report_missing(unsigned char status) {
+    clrscr();
+    cputsxy(0, 0, "NO VBXE FX CORE FOUND.");
+    if (status == VBXE_WRONG_CORE) {
+        cputsxy(0, 2, "THIS BOARD RUNS THE GTIA-EMU CORE,");
+        cputsxy(0, 3, "WHICH HAS NO OVERLAY, XDL OR VRAM");
+        cputsxy(0, 4, "WINDOW FOR THIS BUILD TO DRAW INTO.");
+    } else {
+        cputsxy(0, 2, "PROBED $D640 AND $D740; NEITHER");
+        cputsxy(0, 3, "ANSWERED WITH AN FX CORE VERSION.");
+    }
+    cputsxy(0, 6, "RUN BUILD/UNO.XEX FOR THE STOCK");
+    cputsxy(0, 7, "40-COLUMN BUILD INSTEAD.");
+    /* Hold the screen. Returning straight to DOS wipes this before anyone
+       can read it -- the machine warm-starts and the notice is gone in
+       well under a second. */
+    cputsxy(0, 9, "PRESS ANY KEY.");
+    cgetc();
+}
 
 #define VIC_RASTER (*(unsigned char *)0xD40B)  /* ANTIC VCOUNT, still ticking under VBXE */
 
@@ -136,16 +198,31 @@ void wait_vsync(void) {
     }
 }
 
-void vbxe_init(void) {
+unsigned char vbxe_init(void) {
     /* The real Atari ROM character set: CHBAS ($02F4) holds its base
        page, page*256 = the actual address (normally $E0 -> $E000 at
        boot). Reading this instead of hardcoding $E000 costs nothing
        and is the documented, correct way to find it. */
     unsigned char chbas = *(unsigned char *)0x02F4;
     unsigned char *rom_font = (unsigned char *)((unsigned int)chbas << 8);
+    unsigned char status = detect_core();
 
-    vram_write(VRAM_FONT, rom_font, 1024);
-    vram_write(VRAM_FONT + 1024, rom_font, 1024); /* codes 128-255: unused, just a spare copy */
+    if (status != VBXE_OK) {
+        return status;
+    }
+
+    /* Both font copies live at VRAM $0800-$0FFF, entirely inside MEMAC
+       bank 0, so the bank can be selected once and the CPU window written
+       straight through with memcpy. The general vram_write() path does an
+       unsigned-long divide AND modulo per byte, which made these two
+       kilobytes take roughly a second on their own -- the same trap that
+       made an early screen clear look like a hang (see the driver notes
+       above about SCREEN_WIN). */
+    select_bank(VRAM_FONT);
+    memcpy(MEMAC_A + (unsigned int)(VRAM_FONT & 0x1FFFUL), rom_font, 1024);
+    /* Codes 128-255 are unused here; a spare copy keeps an inverse-video
+       glyph fetch from pulling whatever happens to be in VRAM. */
+    memcpy(MEMAC_A + (unsigned int)((VRAM_FONT + 1024) & 0x1FFFUL), rom_font, 1024);
 
     /* Palette 0 (ANTIC/GTIA/P-M's default) is left at VBXE's factory
        colors; only palette 1 (the Overlay's default) is programmed,
@@ -316,6 +393,8 @@ void vbxe_init(void) {
        here, so the stock ANTIC display underneath is just noise bleeding
        through the OVOFF top border. Matches Cactus's setup. */
     *(unsigned char *)0x022F = 0;
+
+    return VBXE_OK;
 }
 
 /* Packs a character cell: attribute byte b7=1 (opaque) format, fg in

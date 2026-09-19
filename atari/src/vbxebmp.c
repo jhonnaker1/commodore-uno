@@ -1,19 +1,73 @@
 #include <string.h>
+#include <conio.h>
 #include "vbxebmp.h"
 
-/* ---- VBXE registers ($D6xx base), same as the text driver ---- */
-#define VBXE_BASE 0xD640
-#define VIDEO_CONTROL (*(unsigned char *)(VBXE_BASE + 0x00))
-#define XDL_ADR0 (*(unsigned char *)(VBXE_BASE + 0x01))
-#define XDL_ADR1 (*(unsigned char *)(VBXE_BASE + 0x02))
-#define XDL_ADR2 (*(unsigned char *)(VBXE_BASE + 0x03))
-#define CSEL (*(unsigned char *)(VBXE_BASE + 0x04))
-#define PSEL (*(unsigned char *)(VBXE_BASE + 0x05))
-#define CR (*(unsigned char *)(VBXE_BASE + 0x06))
-#define CG (*(unsigned char *)(VBXE_BASE + 0x07))
-#define CB (*(unsigned char *)(VBXE_BASE + 0x08))
-#define MEMAC_CONTROL (*(unsigned char *)(VBXE_BASE + 0x1E))
-#define MEMAC_BANK_SEL (*(unsigned char *)(VBXE_BASE + 0x1F))
+/* ---- VBXE registers, same layout and probe as the text driver ----
+   Base is $D6xx (slot 0) or $D7xx (slot 1), resolved at runtime by
+   detect_core() below; vbxe_regs points at the FX core register file
+   (base+$40), so the offsets match the $D640-relative ones this driver
+   was brought up with. See vbxevid.c for the full register notes. */
+static unsigned char *vbxe_regs = (unsigned char *)0xD640;
+
+#define VIDEO_CONTROL (vbxe_regs[0x00])
+#define XDL_ADR0 (vbxe_regs[0x01])
+#define XDL_ADR1 (vbxe_regs[0x02])
+#define XDL_ADR2 (vbxe_regs[0x03])
+#define CSEL (vbxe_regs[0x04])
+#define PSEL (vbxe_regs[0x05])
+#define CR (vbxe_regs[0x06])
+#define CG (vbxe_regs[0x07])
+#define CB (vbxe_regs[0x08])
+#define MEMAC_CONTROL (vbxe_regs[0x1E])
+#define MEMAC_BANK_SEL (vbxe_regs[0x1F])
+
+/* Read side of base+$00 is CORE_VERSION: $10 = FX (what this driver
+   needs), $11 = the GTIA-emu core, $FF = open I/O, i.e. no VBXE. The
+   probe is reads only, so it is safe on a machine without the board. */
+#define CORE_VERSION_FX 0x10
+#define CORE_VERSION_GTIA 0x11
+
+static unsigned char detect_core(void) {
+    unsigned char *base;
+    unsigned char ver;
+    unsigned char slot;
+
+    for (slot = 0; slot < 2; slot++) {
+        base = (unsigned char *)(slot == 0 ? 0xD640 : 0xD740);
+        ver = base[0x00];
+        if (ver == CORE_VERSION_FX) {
+            vbxe_regs = base;
+            return VBXE_OK;
+        }
+        if (ver == CORE_VERSION_GTIA) {
+            return VBXE_WRONG_CORE;
+        }
+    }
+    return VBXE_NOT_FOUND;
+}
+
+/* Reported through the stock OS screen editor -- if we are here the
+   bitmap overlay never came up, so conio is the only output left. Lives
+   here rather than in the game's main() because conio.h drags in
+   atari.h, whose COLOR_RED/GREEN/BLUE collide with cards.h's suit
+   constants; this file doesn't include cards.h. */
+void vbmp_report_missing(unsigned char status) {
+    clrscr();
+    cputsxy(0, 0, "NO VBXE FX CORE FOUND.");
+    if (status == VBXE_WRONG_CORE) {
+        cputsxy(0, 2, "THIS BOARD RUNS THE GTIA-EMU CORE,");
+        cputsxy(0, 3, "WHICH HAS NO BITMAP OVERLAY.");
+    } else {
+        cputsxy(0, 2, "PROBED $D640 AND $D740; NEITHER");
+        cputsxy(0, 3, "ANSWERED WITH AN FX CORE VERSION.");
+    }
+    cputsxy(0, 6, "RUN BUILD/UNO.XEX FOR THE STOCK");
+    cputsxy(0, 7, "40-COLUMN BUILD INSTEAD.");
+    /* Hold the screen -- returning to DOS warm-starts the machine and
+       wipes this in well under a second. */
+    cputsxy(0, 9, "PRESS ANY KEY.");
+    cgetc();
+}
 #define VIC_RASTER (*(unsigned char *)0xD40B)   /* ANTIC VCOUNT, still ticks under VBXE */
 
 #define MEMAC_A ((unsigned char *)0x2000)
@@ -86,7 +140,7 @@ void vbmp_wait_vsync(void) {
     while (VIC_RASTER == start) { }
 }
 
-void vbmp_init(void) {
+unsigned char vbmp_init(void) {
     /* SR (320x192, 8bpp) overlay XDL. Structure mirrors the working text
        XDL (vbxevid.c) but the graphics entry uses GMON (xdl1 & 3 == 2,
        bit1) instead of text's TMON, drops CHBASE, and OVSTEP is the pixel
@@ -99,6 +153,11 @@ void vbmp_init(void) {
     unsigned int step = BMP_W;             /* 320 bytes per row */
     unsigned long xdl_off = VRAM_XDL;
     unsigned long ovadr = VRAM_FB;
+    unsigned char status = detect_core();
+
+    if (status != VBXE_OK) {
+        return status;
+    }
 
     /* Entry 1: overlay off (xdl1 bits0-1 = 0), set OVADR + OVATT.
        xdl1: MAPOFF 0x10 | RPTL 0x20 | OVADR 0x40 = 0x70. xdl2: OVATT 0x08. */
@@ -136,6 +195,8 @@ void vbmp_init(void) {
 
     VIDEO_CONTROL = 0x01 | 0x04;     /* xdl_enabled + no_trans */
     *(unsigned char *)0x022F = 0;    /* SDMCTL: disable ANTIC playfield DMA */
+
+    return VBXE_OK;
 }
 
 void vbmp_clear(unsigned char color) {

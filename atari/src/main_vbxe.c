@@ -16,7 +16,9 @@ static void pause_frames(unsigned int n) {
 
 /* Animates a small solid-colored block "flying" between two hand/table
    slots, then erasing itself -- the redraw-based equivalent of the C64
-   port's hardware sprite toss (VBXE has no hardware sprites), moved one
+   port's hardware sprite toss (VBXE has no independently-scanned sprites
+   like the VIC-II's; its "sprites" are blitter-composited, and this
+   driver doesn't use the blitter), moved one
    character cell at a time rather than pixel-by-pixel. Since the caller
    always redraws the affected areas (ui_draw_table/ui_draw_hand) right
    after calling this, the animation only needs to erase its OWN previous
@@ -366,8 +368,13 @@ static unsigned int seed_from_wait(void) {
 int main(void) {
     unsigned char game_over;
     unsigned char human_won;
+    unsigned char status;
 
-    vbxe_init();
+    status = vbxe_init();
+    if (status != VBXE_OK) {
+        vbxe_report_missing(status);
+        return 1;
+    }
     snd_init();
 
     for (;;) {

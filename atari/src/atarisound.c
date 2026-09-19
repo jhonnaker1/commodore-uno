@@ -29,14 +29,31 @@ void snd_init(void) {
     AUDC4 = 0;
 }
 
-/* freq in Hz (approximate -- POKEY's exact divisor math depends on
-   AUDCTL clock-source bits we leave at default, so like the PET port
-   this is tuned by ear rather than computed precisely). */
+/* With AUDCTL = 0 every channel runs from POKEY's base clock as a plain
+   8-bit divider, and the hardware adds one to AUDF:
+
+       f_out = base / (2 * (AUDF + 1))    ->    AUDF = base/(2*f) - 1
+
+   base is 63921 Hz on NTSC (63337 on PAL), so the halved constant below
+   is all the per-note math needs. Rounding to nearest before subtracting
+   matters: plain truncation lands A440 on AUDF 71 (444 Hz) where the
+   correct value is 72 ($48) at 437.8 Hz.
+
+   An earlier version approximated this as 31000/freq with no -1, tuned
+   by ear; that ran about 39 cents sharp (A440 came out at 450 Hz).
+
+   Floor: with an 8-bit divider on the 64 kHz base the lowest reachable
+   tone is 63921/512 = ~125 Hz, so sfx_invalid()'s nominal 110 Hz clamps
+   there. Going lower needs AUDCTL bit 0 (15 kHz base), which would drop
+   every channel four octaves, so it isn't worth it for one effect. */
+#define POKEY_HALF_BASE 31960U  /* NTSC 63921/2; PAL would be 31668 */
+
 static unsigned char freq_to_audf(unsigned int freq) {
-    unsigned int f = 31000U / freq;
-    if (f > 255) f = 255;
-    if (f < 1) f = 1;
-    return (unsigned char)f;
+    unsigned int n = (POKEY_HALF_BASE + (freq >> 1)) / freq; /* round */
+    if (n == 0) return 0;
+    n--;
+    if (n > 255) n = 255;
+    return (unsigned char)n;
 }
 
 static void tone1(unsigned int freq, unsigned char vol, unsigned char jiffies) {

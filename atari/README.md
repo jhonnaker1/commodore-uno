@@ -40,8 +40,12 @@ matching the C64/C128 ports' feature set:
 
 - **Toss animation**: playing a card animates a small colored block from
   the hand slot to the discard pile, redrawn cell-by-cell each frame
-  (`animate_toss_to()` in `main_vbxe.c`) -- VBXE has no hardware sprites,
-  so this is the redraw-based equivalent of the C64 port's sprite motion.
+  (`animate_toss_to()` in `main_vbxe.c`). VBXE has nothing like the
+  VIC-II's independently-scanned hardware sprites -- what its docs call
+  sprites are blitter-composited into the overlay, so their cost is
+  blitter bandwidth rather than free-standing hardware. This driver
+  doesn't drive the blitter at all, so the toss is the redraw-based
+  equivalent of the C64 port's sprite motion.
 - **Deal-in animation**: at the start of each hand, cards animate one at a
   time from the draw pile into the hand grid (`animate_deal()`).
 - **Legal-move highlighting**: on the human's turn, cards that can't be
@@ -98,6 +102,32 @@ GUI-configured `XL_VBXE` profile and the `/gdi` software-renderer flag,
 since Wine/MoltenVK renders Altirra's accelerated output as a solid
 color). It works, but the bridge recipe above is far more reliable.
 
+### Running it without a VBXE fitted
+
+Both VBXE builds probe for the board before touching it. The read side of
+the FX core's first register is `CORE_VERSION`: `$10` is the FX core (the
+only one with the XDL, MEMAC window and palette registers these drivers
+need), `$11` is the GTIA-emu core, which has none of them, and a machine
+with no VBXE at all floats `$FF` back from unused I/O space. The probe
+tries slot 0 (`$D640`) then slot 1 (`$D740`), is reads only, and settles
+which base every later register access uses -- previously the base was
+hardcoded to `$D6xx` and never checked, so on a stock Atari the driver
+wrote into open I/O and the game came up as garbage instead of saying
+why. Now it prints a short notice naming both probed addresses and
+pointing at `build/uno.xex`, then returns to DOS.
+
+Verified in AltirraBridge by booting each VBXE build twice, once with
+`device_set("vbxe", True)` and once with it `False`: the board-present
+runs are unchanged, and the board-absent runs show the notice. The slot-1
+path was checked separately with `base="d700"`, which comes up identically
+-- so the runtime base binding really is being used, not just the address
+the driver used to hardcode.
+
+The one branch that stays unexercised is `VBXE_WRONG_CORE`: Altirra's VBXE
+device only offers the FX core (`version=126`), so there is no way to
+present a `CORE_VERSION` of `$11` to the probe from here. That path is
+reasoned from the register table, not observed.
+
 ### Bugs found on the way (a VBXE-bringup field guide)
 
 Everything below was a real bug, found and fixed in this order. The
@@ -148,8 +178,22 @@ all 24 text rows, then `END`.
 
 ### Possible polish
 
-- The font copy in `vbxe_init` still uses the slow per-byte path (~1s);
-  switch it to the direct-window fast path like the screen functions.
+- **The blitter is still unused.** VBXE's is specced at 6.75 MB/s copy
+  and 13.5 MB/s fill, which would make `scr_clear()` and the bitmap
+  build's fills close to free. The blocker is documentation: the register
+  addresses (`BL_ADR0-2`, `BLITTER_START`, `BLITTER_BUSY` at
+  `$Dx50-$Dx53`) are easy to find, but the layout of the blitter control
+  block they point at is not, and guessing at a hardware structure is
+  exactly what produced the `MA_CPU` bug below. Wants a read of Altirra's
+  `vbxe.cpp` blitter path, or a working example, before anyone tries.
+  (Note the blitter operates on VRAM, so it could not have sped up the
+  font copy, which sources from OS ROM -- that one is fixed instead by
+  selecting the bank once and `memcpy`ing straight through the CPU
+  window, as the screen functions do. Measured under AltirraBridge by
+  timing `vbxe_init()` against RTCLOK: **133 jiffies (2.22s) on the old
+  per-byte path, 29 (0.48s) now** -- so the font copy alone had been
+  costing about 1.7 seconds, rather more than the "~1s" this note used
+  to estimate.)
 - Opponent hands are still shown as plain "CPUn: NN" text rather than a
   tile/pile graphic -- consistent with how every other port here shows
   opponents, so likely not worth changing, but an option if desired.

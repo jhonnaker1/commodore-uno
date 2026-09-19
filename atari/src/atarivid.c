@@ -9,9 +9,11 @@ void atari_init(void) {
     clrscr();
 }
 
-/* No CPU-visible raster/vsync register is used here (unlike the VIC-II
-   or TED) -- paced with the OS jiffy clock instead, same approach as
-   the PET port. */
+/* ANTIC does expose a CPU-visible scanline counter -- VCOUNT at $D40B --
+   and the VBXE driver (vbxevid.c) polls it for a real per-frame wait.
+   This build doesn't need that precision: it only paces UI animation on
+   a 40x24 text screen, so it rides the OS jiffy clock (RTCLOK, reached
+   through cc65's clock()) instead, the same approach as the PET port. */
 void wait_vsync(void) {
     while (clock() < next_tick) {}
     next_tick = clock() + 1;

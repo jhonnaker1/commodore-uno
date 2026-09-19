@@ -56,7 +56,17 @@
 #define TILE_SEL_DIM 20
 #define NUM_PALETTE_COLORS 21
 
-void vbxe_init(void);
+/* vbxe_init() return codes. VBXE is an add-on board, so a build using
+   this driver can perfectly well be run on a machine that hasn't got
+   one -- the caller is expected to say so and bail rather than draw into
+   hardware that isn't there. */
+#define VBXE_OK 0
+#define VBXE_NOT_FOUND 1   /* nothing answering at $D6xx or $D7xx */
+#define VBXE_WRONG_CORE 2  /* VBXE present, but the GTIA-emu core */
+
+unsigned char vbxe_init(void);
+/* Prints why vbxe_init() failed, using the stock OS screen editor. */
+void vbxe_report_missing(unsigned char status);
 unsigned char vram_read_byte(unsigned long vram_addr);
 void wait_vsync(void);
 void scr_clear(void);

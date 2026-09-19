@@ -209,6 +209,17 @@ static unsigned int seed_from_wait(void) {
 
 int main(void) {
     unsigned char game_over, human_won;
+    unsigned char status;
+
+    /* Probe before the UI touches anything: ui_title_screen() calls
+       vbmp_init() itself every round, but by then there is no way left to
+       report a missing board -- the bitmap layer is the only output this
+       build has. Reported through the stock OS screen editor instead. */
+    status = vbmp_init();
+    if (status != VBXE_OK) {
+        vbmp_report_missing(status);
+        return 1;
+    }
 
     snd_init();
 

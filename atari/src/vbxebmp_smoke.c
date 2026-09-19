@@ -9,7 +9,9 @@
 #define VAL_WILD 13
 
 int main(void) {
-    vbmp_init();
+    if (vbmp_init() != VBXE_OK) {
+        return 1;   /* no VBXE FX core at $D640 or $D740 */
+    }
 
     /* palette used by the card renderer: 0 black, 1 white, 2 red, 3 green,
        4 blue, 5 yellow, 12 gray(wild), 15 shadow, 16 felt table */
