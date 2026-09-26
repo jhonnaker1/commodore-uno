@@ -37,7 +37,7 @@ uses [llvm-mos](https://llvm-mos.org/) instead. Both are tested in
 
 Each platform is its own self-contained subdirectory sharing the same card
 game logic — `cards.c`, `game.c` and `ai.c` are byte-identical across all
-eighteen C ports (the C64 OS one is 6502 assembly and shares no source) —
+nineteen C ports (the C64 OS assembly port shares no source; its C sibling does) —
 with a platform-specific video, sound, and input layer underneath, since the
 hardware capabilities vary wildly across this lineup. Their
 headers are shared too, apart from what the 68000's alignment rules force:
@@ -66,6 +66,7 @@ instructions are in the release notes). To build from source instead, see
 | [`amiga/`](amiga) | Commodore Amiga (68000, Kickstart 2.0+) | Complete — a custom Intuition screen with a real 8-color palette (not the default Workbench screen's washed-out few shades) drawn through console.device with ANSI escape codes, 4-channel Paula sound with a generated sine-wave tone and volume envelope, keyboard input via IDCMP_VANILLAKEY (comma/period/'U' for movement instead of cursor keys — see Controls). Also ships a separate **bitmap-graphics** build (`make bmp`) that renders the whole game as pixel-art cards in a 320×256 16-colour screen, with the card bodies drawn as blitter `RectFill`s and text via the topaz ROM font — the same look as the Atari ST and X16/VBXE bitmap builds (see [`amiga/`](amiga)) |
 | [`cbm510/`](cbm510) | Commodore CBM-II (510/P500) | Complete — the one CBM-II model with a real VIC-II and SID (same chips as the C64, reached through cc65's `pokebsys()`/`peekbsys()` since they live in a separate bank-switched "system bank" plain pointers can't reach), full-color card borders and SID sound effects, same box-drawing charset as the C64/C128 (stock PETSCII, no custom chargen needed) |
 | [`c64os/`](c64os) | Commodore 64, running [C64 OS](https://c64os.com/) | In progress — a real windowed C64 OS application (not a shortcut to the bare-metal `c64/` port), written in 6502 assembly against C64 OS's own TMP-syntax KERNAL, hand-assembled with the cross-platform TMPx assembler since it's a closed-source commercial OS with its own SDK, no C toolchain |
+| [`c64os-llvm/`](c64os-llvm) | Commodore 64, running [C64 OS](https://c64os.com/) | Complete — the same kind of windowed C64 OS application, but in **C**: built by [llvm-mos](https://llvm-mos.org/) with the shared, byte-identical `cards.c`/`game.c`/`ai.c` instead of a hand port to assembly, plus the C64 port's SID sound effects. A small assembly shim supplies C64 OS's application header, layer and KERNAL link table, and moves C's zero-page registers out of C64 OS's way — its interrupt handler owns the usual `$02`–`$21` (see [`c64os-llvm/`](c64os-llvm)) |
 | [`zxspectrum/`](zxspectrum) | Sinclair ZX Spectrum 48K | Complete — Z80 (not 6502) via z88dk; 32x24 text over a bitmap with per-8x8-cell ink/paper color (the classic "attribute clash"), cards shown as bracketed color-letter labels like the VIC-20/PET/Atari ports, `O`/`P`/`Q` "keys as joystick" scheme since a real Spectrum has no cursor keys, 1-bit beeper sound |
 | [`coco/`](coco) | Tandy Color Computer 3 | Complete — a fourth CPU family (Motorola 6809), built with [CMOC](https://github.com/stahta01/cmoc) and tested in [XRoar](https://www.6809.org.uk/xroar/); ships as a Disk Basic machine-language file that `LOADM`/`EXEC`s, so no disk image is needed. Keyboard-only, scanned straight off the keyboard matrix. The CoCo 3's GIME actually *does* have true per-character colour via Super Extended Color Basic's `attr()`, unlike the PET/VIC-20/Atari/Spectrum ports — but the cards keep those ports' bracketed `[label:COLORLETTER+VALUE]` convention for consistency, with `attr()` used only for the selection highlight. Its colour arguments are raw GIME text-palette slots rather than RGB, and index 1 turned out to be the same hue as the default background (invisible), so text uses index 4 and the highlight index 7 — see [`coco/`](coco) |
 | [`x16/`](x16) | Commander X16 | Complete — the modern 8-bit machine; talks straight to its VERA video chip (per-cell fg+bg color) for solid colored card tiles with legal-move dimming and a pulsing selection highlight, a real **hardware-sprite** card toss (VERA has 128 sprites), and VERA PSG sound — the same feature set as the C64/VBXE ports. Also ships a separate **bitmap-graphics** build (`make bmp`) that renders the whole game in a 320×240 256-color framebuffer via the KERNAL GRAPH API — pixel-drawn card faces and a fanned hand |
@@ -97,6 +98,7 @@ cd amiga && make      # build/uno -- needs m68k-amigaos-gcc on your PATH, see be
 cd amiga && make bmp  # build/unobmp -- the bitmap-graphics build (see amiga/)
 cd cbm510 && make run # build/uno.prg in xcbm5x0
 cd c64os && make run  # dist/uno_1.0.d64 in x64sc, booting C64 OS -- see c64os/ below
+cd c64os-llvm && make install && make run  # the C build of the C64 OS app -- see c64os-llvm/
 cd zxspectrum && make Z88DK_DIR=/path/to/z88dk run  # build/uno.sna in MAME's spectrum driver
 cd coco && make run CMOC_DIR=/path/to/cmoc  # build/uno.bin in XRoar (needs your own coco3.rom in coco/rom/)
 cd x16 && make run X16EMU=/path/to/x16emu_dir  # build/uno.prg in the Commander X16 emulator
@@ -466,6 +468,14 @@ each machine that cost the most time to work out.
   purchased copy of C64 OS (`c64os/rom/c64os.dhd`) and a CMD HD Boot ROM
   (`c64os/rom/cmd_hd_bootrom.bin`), neither of which is included here --
   see `c64os/README.md`.
+
+  [`c64os-llvm/`](c64os-llvm) is the same application in C: "no C
+  toolchain" turned out to be true of TMPx rather than of C64 OS, since an
+  application is only a `$0900` PRG with five vectors and a link table, and
+  llvm-mos links one. What C64 OS demands of compiled C -- chiefly zero
+  page, where its interrupt handler decrements bytes llvm-mos would
+  otherwise use for registers -- is written up in `c64os-llvm/README.md`,
+  from C64 OS's own `//os/docs/memory.t`.
 
 - **ZX Spectrum**: another non-6502/non-cc65 port, this time Z80 via
   z88dk. Builds straight to an `.sna` snapshot instead of a `.tap` tape
