@@ -154,3 +154,52 @@ command from a BASIC/terminal prompt if you have one open).
   correct one). Also: `.block`/`.bend` scopes *all* labels declared
   inside it, including plain data bytes, not just code -- so any state
   shared between routines in different blocks has to live at file scope.
+
+## To fix
+
+Recorded 2026-09-26 while building [`../c64os-llvm`](../c64os-llvm), the C
+version of this app, which is where most of these were found. Each says
+whether it was measured or still needs checking against this binary. The
+working tree also has uncommitted changes to `src/main.s` and `Makefile`
+(a "cpu N is thinking" line, a key footer, draining the whole key queue,
+`s` to restart) that touch some of this; reconcile with those first.
+
+1. **The Wild Draw Four challenge prompt is inverted.** `hxk_confirm`
+   passes `challenge_sel` straight to `resolve_wd4`, but `challenge_sel` is
+   0 when `[yes]` is bracketed, and `resolve_wd4` reads 0 as *no
+   challenge* -- so `[yes]` declines and `[no]` challenges. One
+   instruction: `eor #1` before the `jsr resolve_wd4`. *Confirmed by
+   reading the code, in `HEAD` and in the working tree.*
+2. **CPU turns are probably not seen one at a time.** The VIC shows the RAM
+   under I/O at `$DC00` (`$DD00` = `$C4`, `$D018` = `$75`, measured in VICE
+   under C64 OS); `scrbuf` (`$0400`) and `colbuf` (`$D800`) are buffers,
+   which C64 OS copies to the screen at the end of each event-loop pass.
+   `after_action`'s `jsr drawmain` fills the buffers and then busy-waits
+   inside the same key event, so nothing reaches the screen until the whole
+   chain of CPU turns is over. It also runs with I/O banked *in* (`$01` =
+   `$36` in key handlers), so its colour blit writes live colour RAM rather
+   than the buffer. `os_present` in `../c64os-llvm/src/app.s` does the copy
+   and ports as-is. *Measured on the C build, which had the same structure
+   and showed the symptom; not yet checked on this binary* -- the Notes
+   above say CPU turns were verified visible, so check which is right.
+3. **No sound.** `../c64os-llvm/src/sid.c` is the bare C64 port's SID
+   effects; under C64 OS they need I/O banked in around them (`io_on` /
+   `io_off` in `../c64os-llvm/src/main.c`).
+4. **The hand stops drawing at 20 cards** (`cmp #20` in `draw_hand`), but a
+   hand holds up to 40, and the cursor can move onto cards that are not
+   shown. Six to a row from row 9, all 40 fit in rows 9-15. *Confirmed by
+   reading the code.*
+5. **`make run`'s auto-copy probably never updates the installed app.**
+   `C64EMU_BOOTCMD` types `@cd//os/applications/uno` and
+   `@c0:main.o=8:main.o`. JiffyDOS's `@` talks to device 8 unless told
+   `@#10` first, and CMD DOS's copy works within one device and answers
+   `00, OK` while writing nothing -- both measured in ega trek's C64 OS
+   experiment, not yet here. `../c64os-llvm/tools/install.bas` is a
+   replacement that copies across devices and compares every byte.
+6. **`make d64` writes `menu.m` and `about.t` as PRG.** Every app C64 OS
+   ships has them as SEQ. Not known to matter; `../c64os-llvm` writes SEQ
+   (`c1541 -write file "name,s"`).
+
+Not a bug, but the reason for most of the above: `src/engine.s` is a hand
+port of the shared rules, so any rules fix has to be made twice.
+`../c64os-llvm` compiles the shared `cards.c`/`game.c`/`ai.c` directly.

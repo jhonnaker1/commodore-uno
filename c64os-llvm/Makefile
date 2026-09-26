@@ -2,6 +2,8 @@
 #
 #   make           build/uno/ -- the app bundle: main.o, menu.m, about.t
 #   make d64       build/uno-c64os-llvm.d64, the bundle on a disk image
+#   make zip       build/uno-c64os-llvm.zip, the release asset: the bundle
+#                  in a unoc/ folder, ready for //os/applications/
 #   make install   copy the bundle onto a C64 OS disk, read it back, and
 #                  print the checksums it found beside the ones expected
 #   make run       boot C64 OS from that disk (double-click "unoc" to play)
@@ -16,6 +18,7 @@ OBJ      = build/main.o
 MENU     = build/menu.m
 ABOUT    = build/about.t
 D64      = build/uno-c64os-llvm.d64
+ZIP      = build/uno-c64os-llvm.zip
 
 SRC = src/app.s src/main.c src/sid.c src/cards.c src/game.c src/ai.c
 
@@ -46,7 +49,7 @@ X64 = x64sc -default +saveres \
       -controlport1device 3 -fslongnames -reu -reusize 16384 -keybuf-delay 50 \
       -busdevice8 -drive8type 0 -drive10type 4844 -fs8 $(FS8) -10 $(WORK_DHD)
 
-.PHONY: all d64 sums install run clean
+.PHONY: all d64 zip sums install run clean
 
 all: $(BUNDLE)
 
@@ -66,12 +69,27 @@ $(BUNDLE): $(OBJ) $(MENU) $(ABOUT)
 
 d64: $(D64)
 
+# menu.m and about.t are SEQ, as in every app C64 OS ships; ",s" is how
+# c1541 is told.
 $(D64): $(BUNDLE)
 	rm -f $@
 	c1541 -format uno,8 d64 $@ \
 	  -write $(BUNDLE)/main.o main.o \
-	  -write $(BUNDLE)/menu.m menu.m \
-	  -write $(BUNDLE)/about.t about.t
+	  -write $(BUNDLE)/menu.m "menu.m,s" \
+	  -write $(BUNDLE)/about.t "about.t,s"
+
+zip: $(ZIP)
+
+# Every entry carries the same fixed timestamp, so the archive reproduces
+# byte for byte -- a zip's embedded dates are otherwise the one thing that
+# differs between two builds of identical files.
+$(ZIP): $(BUNDLE)
+	python3 -c 'import sys, zipfile; \
+	  z = zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED); \
+	  d = (2026, 9, 26, 0, 0, 0); \
+	  z.writestr(zipfile.ZipInfo("$(APP)/", d), ""); \
+	  [z.writestr(zipfile.ZipInfo("$(APP)/" + n, d), open("$(BUNDLE)/" + n, "rb").read(), zipfile.ZIP_DEFLATED) for n in ("main.o", "menu.m", "about.t")]; \
+	  z.close()' $@
 
 $(C64OS_DHD) $(CMDHD_ROM) $(JD_KERNAL):
 	@echo "Missing $@ -- supply your own C64 OS image and ROMs; see README.md."
@@ -108,4 +126,4 @@ run: $(FS8) $(WORK_DHD) $(CMDHD_ROM) $(JD_KERNAL)
 
 clean:
 	rm -rf build/main.o build/main.o.elf build/main.map build/menu.m \
-	  build/about.t $(BUNDLE) $(FS8) $(D64)
+	  build/about.t $(BUNDLE) $(FS8) $(D64) $(ZIP)

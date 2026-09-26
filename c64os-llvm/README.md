@@ -39,6 +39,7 @@ They default to `../c64os/rom/` (`c64os.dhd`, `cmd_hd_bootrom.bin`,
 ```
 make           # build/uno/ -- the bundle: main.o, menu.m, about.t
 make d64       # build/uno-c64os-llvm.d64 -- the bundle on a disk image
+make zip       # build/uno-c64os-llvm.zip -- the release asset, a unoc/ folder
 make install   # copy it onto C64 OS's disk, then verify it byte by byte
 make run       # boot C64 OS; double-click "unoc" in //os/applications/
 ```
@@ -58,7 +59,8 @@ Manager comes back. It looks exactly like an app that crashed on launch.
 That cost three launches before a directory listing showed `0 "main.o" *prg`.
 
 On a real C64 with C64 OS: copy the three files from `build/uno/` (or the
-`.d64`) into a new folder under `//os/applications/`. `main.o` is a PRG;
+`.d64`, or the `unoc/` folder in the release zip, whose timestamps are fixed
+so it rebuilds byte for byte) into a new folder under `//os/applications/`. `main.o` is a PRG;
 `menu.m` and `about.t` must be SEQ, like every app C64 OS ships.
 
 ## Controls
