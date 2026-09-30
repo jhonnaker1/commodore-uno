@@ -1,12 +1,11 @@
-10 rem install the app bundle from device 8 onto the c64 os disk (10),
-20 rem then compare every byte on the disk with the source and print
-30 rem "ok" and the length, or the first difference. an install that
-35 rem verifies itself. main.o is prg; menu.m, about.t are seq, as shipped.
+10 rem copy files from device 8 into //os/applications/{APP} on the c64 os
+20 rem disk (device 10) -- or into //os/applications itself when {APP} is
+30 rem empty, as for a .car -- then compare every byte with the source and
+35 rem print "ok" and the length, or the first difference.
 40 open15,10,15
 50 print#15,"cd//os/applications"
-60 print#15,"md:{APP}"
-70 print#15,"cd//os/applications/{APP}"
-80 for f=1 to 3:read n$,t$
+60 a$="{APP}":if a$<>"" then print#15,"md:"+a$:print#15,"cd//os/applications/"+a$
+80 for f=1 to {N}:read n$,t$
 90 print#15,"s:"+n$
 100 open1,8,2,n$+","+t$+",r":open2,10,2,n$+","+t$+",w"
 110 get#1,a$:s=st:if a$="" then a$=chr$(0)
@@ -22,4 +21,4 @@
 210 if e>=0 then print n$;" differs at";e
 220 next
 230 print#15,"cd//":close15
-240 data main.o,p,menu.m,s,about.t,s
+240 data {DATA}

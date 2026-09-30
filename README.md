@@ -98,7 +98,7 @@ cd amiga && make      # build/uno -- needs m68k-amigaos-gcc on your PATH, see be
 cd amiga && make bmp  # build/unobmp -- the bitmap-graphics build (see amiga/)
 cd cbm510 && make run # build/uno.prg in xcbm5x0
 cd c64os && make run  # dist/uno_1.0.d64 in x64sc, booting C64 OS -- see c64os/ below
-cd c64os-llvm && make install && make run  # the C build of the C64 OS app -- see c64os-llvm/
+cd c64os-llvm && make car  # build/unoc.car, the C build as a C64 OS archive; make install && make run tries it in VICE -- see c64os-llvm/
 cd zxspectrum && make Z88DK_DIR=/path/to/z88dk run  # build/uno.sna in MAME's spectrum driver
 cd coco && make run CMOC_DIR=/path/to/cmoc  # build/uno.bin in XRoar (needs your own coco3.rom in coco/rom/)
 cd x16 && make run X16EMU=/path/to/x16emu_dir  # build/uno.prg in the Commander X16 emulator

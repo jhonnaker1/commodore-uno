@@ -2,11 +2,17 @@
 #
 #   make           build/uno/ -- the app bundle: main.o, menu.m, about.t
 #   make d64       build/uno-c64os-llvm.d64, the bundle on a disk image
-#   make zip       build/uno-c64os-llvm.zip, the release asset: the bundle
-#                  in a unoc/ folder, ready for //os/applications/
+#   make car       build/unoc.car -- the bundle as C64 OS apps ship: copied
+#                  to //os/applications and double-clicked, C64 OS's own
+#                  extractor makes the unoc folder
+#   make zip       build/uno-c64os-llvm.zip, the release asset: unoc.car
+#                  and README.txt in an uno-c64os-llvm/ folder
 #   make install   copy the bundle onto a C64 OS disk, read it back, and
 #                  print the checksums it found beside the ones expected
 #   make run       boot C64 OS from that disk (double-click "unoc" to play)
+#   make install-car / run-car   the same, but with only unoc.car, on a
+#                  separate fresh disk -- the release, tested the way a
+#                  player installs it
 #
 # The game rules are the shared cards.c/game.c/ai.c -- byte-identical to
 # every other C port, which `make check` at the repo root enforces. The
@@ -18,7 +24,11 @@ OBJ      = build/main.o
 MENU     = build/menu.m
 ABOUT    = build/about.t
 D64      = build/uno-c64os-llvm.d64
+CAR      = build/unoc.car
 ZIP      = build/uno-c64os-llvm.zip
+
+# The archive's date, fixed so the same bundle makes the same .car.
+CAR_DATE = 2026-09-29
 
 SRC = src/app.s src/main.c src/sid.c src/cards.c src/game.c src/ai.c
 
@@ -49,7 +59,7 @@ X64 = x64sc -default +saveres \
       -controlport1device 3 -fslongnames -reu -reusize 16384 -keybuf-delay 50 \
       -busdevice8 -drive8type 0 -drive10type 4844 -fs8 $(FS8) -10 $(WORK_DHD)
 
-.PHONY: all d64 zip sums install run clean
+.PHONY: all d64 car zip sums install run install-car run-car clean
 
 all: $(BUNDLE)
 
@@ -62,9 +72,12 @@ $(MENU): src/menu.json tools/c64os_meta.py
 $(ABOUT): tools/c64os_meta.py
 	python3 tools/c64os_meta.py about uno 1.0 2026 "Commodore UNO" > $@
 
+# files.txt lists the bundle as "name,type" for mkcar.py: main.o is a PRG,
+# menu.m and about.t are SEQ, as in every app C64 OS ships.
 $(BUNDLE): $(OBJ) $(MENU) $(ABOUT)
 	mkdir -p $@
 	cp $^ $@/
+	printf 'main.o,p\nmenu.m,s\nabout.t,s\n' > $@/files.txt
 	@touch $@
 
 d64: $(D64)
@@ -78,17 +91,29 @@ $(D64): $(BUNDLE)
 	  -write $(BUNDLE)/menu.m "menu.m,s" \
 	  -write $(BUNDLE)/about.t "about.t,s"
 
+car: $(CAR)
+
+# Written by tools/mkcar.py (the ega trek project's, where the format was
+# measured against real third-party C64 OS apps) and read straight back --
+# every record and the CRC32 trailer -- before anything uses it. The name is
+# short and lowercase: it is copied onto a C64 filesystem, 16 characters.
+$(CAR): $(BUNDLE) tools/mkcar.py
+	python3 tools/mkcar.py write $(BUNDLE) "$(APP)" "UNO for C64 OS, llvm-mos" $(CAR_DATE) $@
+	python3 tools/mkcar.py read $@ > /dev/null
+
 zip: $(ZIP)
 
-# Every entry carries the same fixed timestamp, so the archive reproduces
-# byte for byte -- a zip's embedded dates are otherwise the one thing that
-# differs between two builds of identical files.
-$(ZIP): $(BUNDLE)
+# The release: unoc.car and README.txt in an uno-c64os-llvm/ folder. Every
+# entry carries one fixed timestamp, so the zip reproduces byte for byte --
+# its embedded dates are otherwise the one thing that differs between two
+# builds of identical files.
+$(ZIP): $(CAR) README-release.txt
 	python3 -c 'import sys, zipfile; \
 	  z = zipfile.ZipFile(sys.argv[1], "w", zipfile.ZIP_DEFLATED); \
-	  d = (2026, 9, 26, 0, 0, 0); \
-	  z.writestr(zipfile.ZipInfo("$(APP)/", d), ""); \
-	  [z.writestr(zipfile.ZipInfo("$(APP)/" + n, d), open("$(BUNDLE)/" + n, "rb").read(), zipfile.ZIP_DEFLATED) for n in ("main.o", "menu.m", "about.t")]; \
+	  d = (2026, 9, 29, 0, 0, 0); f = "uno-c64os-llvm/"; \
+	  z.writestr(zipfile.ZipInfo(f, d), ""); \
+	  [z.writestr(zipfile.ZipInfo(f + n, d), open(s, "rb").read(), zipfile.ZIP_DEFLATED) \
+	   for n, s in (("unoc.car", "$(CAR)"), ("README.txt", "README-release.txt"))]; \
 	  z.close()' $@
 
 $(C64OS_DHD) $(CMDHD_ROM) $(JD_KERNAL):
@@ -103,11 +128,29 @@ $(WORK_DHD): | $(C64OS_DHD)
 # `load"install",8` does not find install.prg.
 $(FS8): $(BUNDLE) tools/install.bas
 	mkdir -p $@
-	cp $(BUNDLE)/* $@/
-	sed 's/{APP}/$(APP)/g' tools/install.bas > $@/install.txt
+	cp $(BUNDLE)/main.o $(BUNDLE)/menu.m $(BUNDLE)/about.t $@/
+	sed -e 's/{APP}/$(APP)/g' -e 's/{N}/3/' -e 's/{DATA}/main.o,p,menu.m,s,about.t,s/' \
+	  tools/install.bas > $@/install.txt
 	petcat -w2 -o $@/install -- $@/install.txt
 	rm $@/install.txt
 	@touch $@
+
+# The .car test: only unoc.car, into //os/applications itself, on a disk
+# of its own -- a fresh C64 OS with no unoc folder, as a player has.
+CAR_FS8 = $(CURDIR)/build/fs8car
+CAR_DHD = $(CURDIR)/build/cartest.dhd
+
+$(CAR_FS8): $(CAR) tools/install.bas
+	mkdir -p $@
+	cp $(CAR) $@/
+	sed -e 's/{APP}//' -e 's/{N}/1/' -e 's/{DATA}/unoc.car,p/' \
+	  tools/install.bas > $@/install.txt
+	petcat -w2 -o $@/install -- $@/install.txt
+	rm $@/install.txt
+	@touch $@
+
+$(CAR_DHD): | $(C64OS_DHD)
+	cp $(C64OS_DHD) $@
 
 # What the installer should print, to compare with the screen.
 sums: $(BUNDLE)
@@ -124,6 +167,17 @@ install: $(FS8) $(WORK_DHD) $(CMDHD_ROM) $(JD_KERNAL) sums
 run: $(FS8) $(WORK_DHD) $(CMDHD_ROM) $(JD_KERNAL)
 	$(X64) -keybuf 'load"c64os",10\nrun\n'
 
+X64_CAR = $(subst -fs8 $(FS8) -10 $(WORK_DHD),-fs8 $(CAR_FS8) -10 $(CAR_DHD),$(X64))
+
+# Prints "unoc.car ok <length>"; close VICE, then `make run-car`, and in
+# C64 OS double-click unoc.car in //os/applications, then the unoc folder
+# it extracts.
+install-car: $(CAR_FS8) $(CAR_DHD) $(CMDHD_ROM) $(JD_KERNAL)
+	$(X64_CAR) -warp -keybuf 'load"install",8\nrun\n'
+
+run-car: $(CAR_FS8) $(CAR_DHD) $(CMDHD_ROM) $(JD_KERNAL)
+	$(X64_CAR) -keybuf 'load"c64os",10\nrun\n'
+
 clean:
 	rm -rf build/main.o build/main.o.elf build/main.map build/menu.m \
-	  build/about.t $(BUNDLE) $(FS8) $(D64) $(ZIP)
+	  build/about.t $(BUNDLE) $(FS8) $(CAR_FS8) $(D64) $(CAR) $(ZIP)

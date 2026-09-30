@@ -38,11 +38,24 @@ They default to `../c64os/rom/` (`c64os.dhd`, `cmd_hd_bootrom.bin`,
 
 ```
 make           # build/uno/ -- the bundle: main.o, menu.m, about.t
+make car       # build/unoc.car -- the bundle as a C64 OS archive
+make zip       # build/uno-c64os-llvm.zip -- the release: unoc.car + README.txt
 make d64       # build/uno-c64os-llvm.d64 -- the bundle on a disk image
-make zip       # build/uno-c64os-llvm.zip -- the release asset, a unoc/ folder
-make install   # copy it onto C64 OS's disk, then verify it byte by byte
+make install   # copy the bundle onto C64 OS's disk, verify it byte by byte
 make run       # boot C64 OS; double-click "unoc" in //os/applications/
+make install-car   # the release path: only unoc.car, onto a fresh disk
+make run-car       # boot it; double-click unoc.car, then the unoc folder
 ```
+
+**The release is a `.car`,** C64 OS's own archive format and how its apps
+ship: copied into `//os/applications/` and double-clicked, C64 OS's
+extractor makes the `unoc` folder. `tools/mkcar.py` is the ega trek
+project's, which measured the format against the third-party archives on a
+C64 OS volume; `make car` writes the archive and reads it straight back,
+checking every record and the CRC32 trailer. Its date is fixed, and so are
+the zip's timestamps, so both rebuild byte for byte. `install-car` and
+`run-car` test it exactly as a player installs it, on a second disk copy
+(`build/cartest.dhd`) with no `unoc` folder on it.
 
 `make install` works on `build/c64os.dhd`, a copy of your disk, never the
 original; delete the copy to start over from a clean C64 OS. It runs a BASIC
@@ -58,10 +71,10 @@ that is silent: the File Manager unloads, nothing loads, and the File
 Manager comes back. It looks exactly like an app that crashed on launch.
 That cost three launches before a directory listing showed `0 "main.o" *prg`.
 
-On a real C64 with C64 OS: copy the three files from `build/uno/` (or the
-`.d64`, or the `unoc/` folder in the release zip, whose timestamps are fixed
-so it rebuilds byte for byte) into a new folder under `//os/applications/`. `main.o` is a PRG;
-`menu.m` and `about.t` must be SEQ, like every app C64 OS ships.
+On a real C64 with C64 OS: copy `unoc.car` into `//os/applications/` and
+double-click it. Or copy the three files from `build/uno/` (or the `.d64`)
+into a new folder there by hand: `main.o` is a PRG, and `menu.m` and
+`about.t` are SEQ, like every app C64 OS ships.
 
 ## Controls
 
@@ -133,7 +146,9 @@ fixed.
 
 In VICE 3.x (`x64sc`, CMD HD, JiffyDOS, 16MB REU): launched from the File
 Manager, several complete rounds played, sound heard, CPU turns seen one at
-a time, and **Game > New Game** and **Game > Quit** both used. The built
+a time, and **Game > New Game** and **Game > Quit** both used. The release
+path too: `unoc.car` alone on a fresh C64 OS disk, double-clicked, unpacked
+by C64 OS into a `unoc` folder, and played from there. The built
 `main.o` is reproducible byte for byte and identical to the binary that was
 played. Not individually exercised yet: a hand beyond 20 cards (slots past
 `J` have no quick key and are reached with the cursor), and the

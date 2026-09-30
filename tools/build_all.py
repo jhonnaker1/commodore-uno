@@ -18,7 +18,7 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 NEEDS_PURCHASED_ROMS = {"c64os"}
 
 # Targets that launch an emulator, need a ROM dump, or just tidy up.
-SKIP = re.compile(r"^(run|clean|install|charset|all)$|^run-")
+SKIP = re.compile(r"^(run|clean|install|charset|all)$|^(run|install)-")
 
 
 # Artefact paths assigned to a variable, e.g. `VDC_OUT = build/uno128vdc.prg`.
