@@ -23,7 +23,7 @@ IDENTICAL = ["cards.c", "game.c", "ai.c", "ai.h"]
 # Both exceptions are forced by the 68000's alignment rules and are
 # described in the main README; anything else differing is a fork.
 ALLOWED = {
-    "cards.h": {"amiga", "ste"},   # `unsigned short _pad` for 2-byte alignment
+    "cards.h": {"amiga", "mac", "ste"},  # `unsigned short _pad` for 2-byte alignment
     "game.h": {"ste"},             # GameState reordered to keep Cards even
 }
 
