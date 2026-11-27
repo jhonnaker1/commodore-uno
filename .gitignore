@@ -17,3 +17,7 @@ mega65/mega65-libc-llvm/
 # Python bytecode from tools/
 __pycache__/
 *.pyc
+
+# the NeXT port is built on the NeXT, in place if the folder is shared to it
+next/obj/
+next/UNO.app/

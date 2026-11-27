@@ -17,6 +17,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent
 # assumed present. Skipped loudly, never silently.
 NEEDS_PURCHASED_ROMS = {"c64os"}
 
+# Built inside the machine's own OS with its own compiler (NeXTSTEP's cc,
+# in an emulator), which no host toolchain here can stand in for yet.
+BUILT_ON_TARGET = {"next"}
+
 # Targets that launch an emulator, need a ROM dump, or just tidy up.
 SKIP = re.compile(r"^(run|clean|install|charset|all)$|^(run|install)-")
 
@@ -80,6 +84,9 @@ def main():
     for port in ports:
         if port in NEEDS_PURCHASED_ROMS:
             print(f"{port:11s} SKIPPED -- needs purchased ROMs")
+            continue
+        if port in BUILT_ON_TARGET:
+            print(f"{port:11s} SKIPPED -- built on the target itself, see its README")
             continue
         subprocess.run(["make", "clean"], cwd=ROOT / port,
                        capture_output=True, text=True)
