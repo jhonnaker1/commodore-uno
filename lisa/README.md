@@ -9,7 +9,7 @@ It shares `cards.c`/`game.c`/`ai.c` with every other port and takes the
 Amiga's padded `cards.h` (the 68000 again), like the Mac and the ST.
 
 **Status: playable with the mouse or the keyboard** in the IDLE emulator
-(inside the BMLisa host simulator), with sound effects on the Lisa's
+(inside the [BMLisa](https://github.com/jhonnaker1/bmlisa) host simulator), with sound effects on the Lisa's
 speaker. The look is the black-and-white Mac port's: patterned suits with
 a letter tab, quartered wild cards, two rows of ten in the hand. It has
 only been run in emulation, never on a real Lisa, and IDLE emulates no
