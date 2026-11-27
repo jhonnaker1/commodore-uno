@@ -14,8 +14,12 @@ trapping, so it needs no padding.
 **Status: playable** with the mouse or the keys, in colour, in the
 [BMNeXT](https://github.com/jhonnaker1/bmnext) host simulator (Previous inside)
 as a NeXTstation Turbo Color on NeXTSTEP 3.3, sound included, and in the
-releases from v1.0.13. Not yet tried: a greyscale NeXTstation, a 68030 NeXT,
-OPENSTEP 4.2, and the menu's keyboard shortcuts.
+releases from v1.0.13. Also tested as a 68030 NeXT Computer with a
+greyscale screen: the suits come out as four distinct greys, and the
+sound, the menu's keyboard shortcuts and starting it from the Workspace
+all work there. And the same program runs unchanged on OPENSTEP 4.2
+(tested on the Turbo Color: play, mouse, colour picker, Info panel,
+sound), which keeps NeXTSTEP 3.3's libraries for old applications.
 
 ## Building
 
